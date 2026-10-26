@@ -10,7 +10,7 @@
 
 <base> e.g. https://brightspace.myuni.edu ; <ou> = orgUnitId, the number in /d2l/home/<id>
 """
-import json, sys, time
+import json, re, sys, time
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -38,7 +38,13 @@ def ctx(p, headless=None):
     """Browser context with the saved login. Visible window by default; `bs.py mode headless` hides it."""
     if headless is None:
         headless = settings().get("headless", False)
-    c = p.chromium.launch_persistent_context(str(PROFILE), headless=headless)
+    args = [  # a visible window behind other apps is throttled as "occluded", which freezes video players' JavaScript
+        "--disable-features=CalculateNativeWinOcclusion", "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding", "--disable-background-timer-throttling"]
+    try:  # visible windows: prefer the real Chrome if installed (has the H.264 codec video players check for)
+        c = p.chromium.launch_persistent_context(str(PROFILE), headless=headless, args=args, **({} if headless else {"channel": "chrome"}))
+    except Exception:
+        c = p.chromium.launch_persistent_context(str(PROFILE), headless=headless, args=args)
     if STATE.exists():
         c.add_cookies(json.loads(STATE.read_text()))
     return c
@@ -77,14 +83,28 @@ def walk_seq(e, depth=0, out=None):
     return out
 
 
-def open_activity(c, base, ou, aid):
-    """Load one topic in the sequence viewer. Returns (page, [(url, response)], activity JSON)."""
+def open_activity(c, base, ou, aid, player=False):
+    """Load one topic in the sequence viewer. Returns (page, [(url, response)], activity JSON).
+    Response bodies are NOT usable (Playwright drops them when the LTI launch navigates the frame): adapters
+    re-fetch the URLs they need from inside the right frame instead. The activity JSON is fetched with the
+    page's own bearer token. player=True also waits for an embedded video player (iframe on another site)."""
     if not (PROFILE / "seq.json").exists():
         sys.exit(f"run first: python scripts/bs.py toc {base} {ou}")
     host = json.loads((PROFILE / "seq.json").read_text())["host"]
-    pg, net = c.new_page(), []
-    seen = lambda: any(f"/activity/{aid}?" in u and "sequences.api" in u for u, _ in net)
-    pg.on("response", lambda r: net.append((r.url, r)))  # bodies are read later: reading inside the handler fails
+    pg, net, auth = c.new_page(), [], {}
+    seen = lambda: bool(auth)
+
+    def grab(r):
+        if "sequences.api" in r.url and "auth" not in auth and "authorization" in r.all_headers():
+            auth["auth"] = r.all_headers()["authorization"]
+
+    pg.on("request", grab)
+    pg.on("response", lambda r: net.append((r.url, r)))
+    try:  # a window that isn't in front reads as "hidden" and some players then refuse to start
+        pg.bring_to_front()
+        c.new_cdp_session(pg).send("Emulation.setFocusEmulationEnabled", {"enabled": True})
+    except Exception:
+        pass
     pg.goto(f"{base}/d2l/le/enhancedSequenceViewer/{ou}?url=https%3A%2F%2F{host}%2F{ou}%2Factivity%2F{aid}%3FfilterOnDatesAndDepth%3D1",
             wait_until="domcontentloaded")  # not networkidle: some topic pages (zip previews) never go idle
     for attempt in range(2):  # the activity response is occasionally missed on the first load: reload once
@@ -95,10 +115,23 @@ def open_activity(c, base, ou, aid):
         if seen() or "login" in pg.url:
             break
         pg.reload(wait_until="domcontentloaded")
+    if player:
+        site = base.split("//")[1]
+        for _ in range(60):  # up to 30 s for the LTI launch to land on the video site
+            if any(f.url.startswith("http") and site not in f.url for f in pg.frames):
+                break
+            time.sleep(0.5)
+        for _ in range(40):  # then up to 20 s for the player to ask for its media (YuJa: VideoSource)
+            if any("/P/Data/VideoSource" in u or re.search(r"\.(m3u8|mpd)", u) for u, _ in net):
+                break
+            time.sleep(0.5)
     time.sleep(6)  # players inject late
     if "login.microsoftonline" in pg.url or "/d2l/login" in pg.url:
         sys.exit(f"session expired: python scripts/bs.py login {base}")
-    act = next((j for u, r in net if f"/activity/{aid}?" in u and "sequences.api" in u and (j := hosts.safe_json(r))), {})
+    act = {}
+    if auth:
+        r = c.request.get(f"https://{host}/{ou}/activity/{aid}?filterOnDatesAndDepth=1", headers={"Authorization": auth["auth"]})
+        act = hosts.safe_json(r) or {}
     return pg, net, act
 
 
@@ -159,9 +192,19 @@ def main(cmd, base, *a):
             print(f"wrote {out / 'toc.md'}")
         elif cmd == "video":
             ou, aid, outdir = a
-            pg, net, _ = open_activity(c, base, ou, aid)
-            x = type("Ctx", (), {"pg": pg, "c": c, "net": net})()
-            hit = next((h for ad in hosts.ADAPTERS if (h := ad(x))), None)
+            def find(c):
+                pg, net, _ = open_activity(c, base, ou, aid, player=True)
+                x = type("Ctx", (), {"pg": pg, "c": c, "net": net})()
+                return pg, next((h for ad in hosts.ADAPTERS if (h := ad(x))), None)
+
+            pg, hit = find(c)
+            title = pg.title()
+            if not (hit and hit["source"]) and not settings().get("headless", False):
+                # some players never start in a visible window (seen with YuJa): retry hidden once
+                print("no stream found in the visible window; retrying hidden (headless)...", flush=True)
+                c.close()
+                c = ctx(p, headless=True)
+                pg, hit = find(c)
             if not hit:
                 sys.exit("no video found on this topic (is it a file/quiz/link?)")
             o = Path(outdir)
@@ -171,7 +214,7 @@ def main(cmd, base, *a):
             (o / "source.txt").write_text(hit["source"])
             if hit["host"] == "embed":  # yt-dlp needs the login cookies to open these
                 write_cookies(c)
-            print(json.dumps({"title": pg.title(), "host": hit["host"], "subs": list(hit["subs"]), "source": bool(hit["source"]), "dir": str(o)}))
+            print(json.dumps({"title": title, "host": hit["host"], "subs": list(hit["subs"]), "source": bool(hit["source"]), "dir": str(o)}))
         elif cmd == "doc":
             ou, aid, outdir = a
             pg, _, act = open_activity(c, base, ou, aid)

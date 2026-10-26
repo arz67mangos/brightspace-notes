@@ -21,7 +21,14 @@ def yuja(x):
     fr = next((f for f in x.pg.frames if "yuja.com/V/Video" in f.url), None)
     if not fr:
         return None
-    j = next((j for u, r in x.net if "/P/Data/VideoSource" in u and (j := safe_json(r))), {})
+    urls = [u for u, _ in x.net if "/P/Data/VideoSource" in u]
+    j = {}
+    for u in reversed(urls):  # newest first: earlier ones belong to a frame navigation that was replaced
+        try:
+            j = fr.evaluate("u => fetch(u).then(r => r.json())", u)  # re-fetched in the player's own frame (bodies of seen responses are gone)
+            break
+        except Exception:
+            continue
     cap = [v for v in j.get("captionURL", {}).values() if isinstance(v, str) and v.endswith(".srt")][:1]
     hls = next(iter(j.get("streams", [{}])[0].get("typeAndVideoSourceMap", {}).values()), {})
     subs = {"video.en.srt": fr.evaluate("u => fetch(u).then(r => r.text())", cap[0])} if cap else {}

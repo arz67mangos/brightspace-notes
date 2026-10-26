@@ -2,7 +2,7 @@
 
   python scripts/docs.py <file> <outdir> [--images]
 
-Supports .pdf (PyMuPDF), .docx, .pptx, .zip (extracted, then each supported file inside), .txt/.md.
+Supports .pdf (PyMuPDF), .docx, .pptx, .html (Brightspace content pages), .zip (extracted, then each supported file inside), .txt/.md.
 Writes <outdir>/<name>.md. PDFs: pages with almost no text (scans, diagram slides) and every page with --images
 are rendered to <outdir>/<name>_pages/pNN.jpg so Claude can look at them. .pptx: text/tables/speaker notes only;
 if LibreOffice (soffice) is installed it is converted to PDF first so slides can be rendered too.
@@ -50,7 +50,9 @@ def docx_(path):
                 md.append(t)
         elif el.tag.endswith("}tbl"):
             for r in Table(el, d).rows:
-                md.append("| " + " | ".join(c.text.strip().replace("\n", " ") for c in r.cells) + " |")
+                cells = [c.text.strip().replace("\n", " ") for c in r.cells]
+                cells = [c for i, c in enumerate(cells) if i == 0 or c != cells[i - 1]]  # merged cells repeat their text
+                md.append("| " + " | ".join(cells) + " |")
     if d.inline_shapes:
         md.append(f"\n(contains {len(d.inline_shapes)} inline image(s) not extracted)")
     return "\n".join(md)
@@ -79,6 +81,39 @@ def pptx_(path):
     return "\n".join(md)
 
 
+def html_(path):
+    """Brightspace content pages (.html): visible text + the links/iframes they point to (scripts/styles dropped)."""
+    from html.parser import HTMLParser
+
+    class P(HTMLParser):
+        skip = 0
+
+        def __init__(s):
+            super().__init__()
+            s.text, s.links = [], []
+
+        def handle_starttag(s, tag, attrs):
+            s.skip += tag in ("script", "style")
+            for k, v in attrs:
+                if k in ("href", "src") and v and not v.startswith(("javascript", "#")) and tag in ("a", "iframe", "img", "source", "video"):
+                    s.links.append(f"{tag}: {v}")
+
+        def handle_endtag(s, tag):
+            s.skip -= tag in ("script", "style")
+            if tag in ("p", "li", "div", "br", "h1", "h2", "h3", "tr"):
+                s.text.append("\n")
+
+        def handle_data(s, d):
+            if not s.skip:
+                s.text.append(d)
+
+    p = P()
+    p.feed(path.read_text(encoding="utf-8", errors="replace"))
+    body = " ".join("".join(p.text).split(" ")).strip()
+    links = "\n".join(f"- {l}" for l in dict.fromkeys(p.links))
+    return f"# {path.name}\n\n{body}\n" + (f"\n## Links on this page\n{links}" if links else "")
+
+
 def handle(path):
     s = path.suffix.lower()
     if s == ".zip":
@@ -92,7 +127,7 @@ def handle(path):
             if f.is_file():
                 handle(f)
         return
-    fn = {".pdf": pdf, ".docx": docx_, ".pptx": pptx_}.get(s)
+    fn = {".pdf": pdf, ".docx": docx_, ".pptx": pptx_, ".html": html_, ".htm": html_}.get(s)
     if fn:
         text = fn(path)
     elif s in (".txt", ".md"):
