@@ -38,6 +38,9 @@ Claude will:
 Other things you can ask: *"quiz me on Topic 2"* (skill `brightspace-quiz`, tracks what you get wrong), *"attempt this tutorial sheet from my notes"* (skill `brightspace-tutorial`, shows which note each answer came from and lists its assumptions), *"make an exam-focus sheet / glossary / cheat sheet"*, *"export Anki cards"*.
 
 ## Check your setup: `doctor`
+**Easiest:** open Claude Code in this folder and type **`/brightspace-check`** (or just say "check my setup"). Claude runs the check, explains the result in plain language, and offers to fix anything missing, including signing you back in to Brightspace.
+
+Or run it yourself:
 ```bash
 python scripts/doctor.py
 ```
