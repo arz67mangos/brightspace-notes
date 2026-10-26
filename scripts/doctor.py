@@ -46,7 +46,7 @@ else:
         import bs
 
         with sync_playwright() as p:
-            c = bs.ctx(p)
+            c = bs.ctx(p, headless=True)  # a health check shouldn't pop a window
             pg = c.new_page()
             pg.goto(f"{base}/d2l/home", wait_until="domcontentloaded")
             pg.wait_for_timeout(3000)

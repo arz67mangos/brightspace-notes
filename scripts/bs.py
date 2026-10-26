@@ -6,6 +6,7 @@
   python scripts/bs.py doc     <base> <ou> <activityId> <dir>  download a file topic (pdf/docx/pptx/zip...)
   python scripts/bs.py page    <base> <ou> <topicId>           dump page text + iframes/links as JSON
   python scripts/bs.py cookies <base>                          write cookies.txt (Netscape) for yt-dlp
+  python scripts/bs.py mode    show|headless                   watch the browser work (default) or hide it
 
 <base> e.g. https://brightspace.myuni.edu ; <ou> = orgUnitId, the number in /d2l/home/<id>
 """
@@ -24,7 +25,19 @@ STATE = PROFILE / "cookies.json"  # SSO cookies are session-only, so the profile
 CONFIG = PROFILE / "config.json"  # {"base": ...}, written by login, read by doctor.py
 
 
-def ctx(p, headless=True):
+def settings():
+    return json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
+
+
+def save_settings(**kw):
+    PROFILE.mkdir(exist_ok=True)
+    CONFIG.write_text(json.dumps({**settings(), **kw}))
+
+
+def ctx(p, headless=None):
+    """Browser context with the saved login. Visible window by default; `bs.py mode headless` hides it."""
+    if headless is None:
+        headless = settings().get("headless", False)
     c = p.chromium.launch_persistent_context(str(PROFILE), headless=headless)
     if STATE.exists():
         c.add_cookies(json.loads(STATE.read_text()))
@@ -102,6 +115,11 @@ def file_links(e, out=None):
 
 def main(cmd, base, *a):
     base = base.rstrip("/")
+    if cmd == "mode":  # mode show|headless: not tied to a school, `base` holds the setting here
+        if base not in ("show", "headless"):
+            sys.exit("usage: bs.py mode show|headless")
+        save_settings(headless=(base == "headless"))
+        return print("browser windows will be " + ("hidden (headless)" if base == "headless" else "shown while scripts run"))
     with sync_playwright() as p:
         if cmd == "login":
             c = ctx(p, headless=False)
@@ -113,7 +131,7 @@ def main(cmd, base, *a):
                 time.sleep(2)
                 if host in pg.url and "/d2l/" in pg.url:
                     STATE.write_text(json.dumps(c.cookies()))
-                    CONFIG.write_text(json.dumps({"base": base}))
+                    save_settings(base=base)
                     print("logged in, session saved", flush=True)
                     break
             return c.close()

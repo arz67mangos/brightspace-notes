@@ -37,6 +37,11 @@ Claude will:
 
 Other things you can ask: *"quiz me on Topic 2"* (skill `brightspace-quiz`, tracks what you get wrong), *"attempt this tutorial sheet from my notes"* (skill `brightspace-tutorial`, shows which note each answer came from and lists its assumptions), *"make an exam-focus sheet / glossary / cheat sheet"*, *"export Anki cards"*.
 
+## Watch it work, or hide it
+By default a Chromium window **opens and you can watch** the scripts browse Brightspace. If you'd rather it work invisibly in the background, just tell your agent: *"switch to headless mode"* (and *"show the browser again"* to undo it). It remembers your choice. The sign-in window is always shown, because you have to sign in yourself.
+
+(Or run it yourself: `python scripts/bs.py mode headless` / `python scripts/bs.py mode show`.)
+
 ## Check your setup: `doctor`
 **Easiest:** open Claude Code in this folder and type **`/brightspace-check`** (or just say "check my setup"). Claude runs the check, explains the result in plain language, and offers to fix anything missing, including signing you back in to Brightspace.
 

@@ -12,6 +12,8 @@ Related skills: `brightspace-tutorial` (answer tutorial sheets from the notes), 
 - First time / something broken: `python scripts/doctor.py` prints exactly what's missing and the fix. `install.ps1` (Windows) / `install.sh` (Mac/Linux) set everything up.
 - `python scripts/bs.py login <base-url>`: opens Chromium, the user signs in (SSO/MFA), the script saves the session and exits by itself. Run it in the background and tell the user to sign in. Re-run when the session expires (symptom: redirect to a login page).
 
+**Browser window:** by default the scripts open a visible Chromium window so the user can watch. The first time you run a browser script in a session, tell the user once: "A browser window will open so you can watch; if you'd rather it ran hidden, say 'switch to headless mode'." When they ask to hide it run `python scripts/bs.py mode headless`; to show it again run `python scripts/bs.py mode show`. Don't touch the window while a script runs. The login window is always visible.
+
 ## 1. Scope first: never crawl everything
 Ask for the base URL and course (or topic). A pasted course URL contains the orgUnitId (`/d2l/home/<id>`). Run `python scripts/bs.py toc <base> <ou>` (one request, writes `notes/<ou>/toc.md` with every module/topic, its activity ID, and kind), show the modules, and ask which ones they want (AskUserQuestion, multi-select). Process only those.
 - **Never open, fetch or answer anything quiz-like**: quizzes, prep quizzes, surveys, assignment dropboxes. The user does those themselves. Also skip group lists, external links, anything not asked for.
