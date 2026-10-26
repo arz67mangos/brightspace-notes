@@ -1,21 +1,27 @@
 """Brightspace helper using a saved login profile (.profile/).
 
-  python scripts/bs.py login   <base>                 one-time, manual login in a visible browser
-  python scripts/bs.py toc     <base> <orgUnitId>     write notes/<ou>/toc.md (modules/topics tree)
-  python scripts/bs.py page    <base> <ou> <topicId>  dump page text + video/iframe/track URLs as JSON
-  python scripts/bs.py cookies <base>                 write cookies.txt (Netscape) for yt-dlp
+  python scripts/bs.py login   <base>                          one-time manual login in a visible browser
+  python scripts/bs.py toc     <base> <ou>                     write notes/<ou>/toc.md (modules/topics + activity IDs)
+  python scripts/bs.py video   <base> <ou> <activityId> <dir>  captions + stream URL (hosts.py adapters)
+  python scripts/bs.py doc     <base> <ou> <activityId> <dir>  download a file topic (pdf/docx/pptx/zip...)
+  python scripts/bs.py page    <base> <ou> <topicId>           dump page text + iframes/links as JSON
+  python scripts/bs.py cookies <base>                          write cookies.txt (Netscape) for yt-dlp
 
-<base> e.g. https://brightspace.myuni.edu
+<base> e.g. https://brightspace.myuni.edu ; <ou> = orgUnitId, the number in /d2l/home/<id>
 """
 import json, sys, time
 from pathlib import Path
+from urllib.parse import unquote
+
 from playwright.sync_api import sync_playwright
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import hosts
 
 ROOT = Path(__file__).resolve().parent.parent
 PROFILE = ROOT / ".profile"
-
-
 STATE = PROFILE / "cookies.json"  # SSO cookies are session-only, so the profile dir alone forgets them
+CONFIG = PROFILE / "config.json"  # {"base": ...}, written by login, read by doctor.py
 
 
 def ctx(p, headless=True):
@@ -30,6 +36,16 @@ def api_version(c, base):
     if not r.ok:
         sys.exit(f"not logged in or bad base URL (HTTP {r.status}); run: bs.py login {base}")
     return next(v["LatestVersion"] for v in r.json() if v["ProductCode"] == "le")
+
+
+def write_cookies(c):
+    lines = ["# Netscape HTTP Cookie File"]
+    for k in c.cookies():
+        lines.append("\t".join([k["domain"], str(k["domain"].startswith(".")).upper(), k["path"],
+                                str(k["secure"]).upper(), str(int(k["expires"])) if k["expires"] > 0 else "0",
+                                k["name"], k["value"]]))
+    (ROOT / "cookies.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("wrote cookies.txt (gitignored)")
 
 
 def walk_seq(e, depth=0, out=None):
@@ -48,6 +64,42 @@ def walk_seq(e, depth=0, out=None):
     return out
 
 
+def open_activity(c, base, ou, aid):
+    """Load one topic in the sequence viewer. Returns (page, [(url, response)], activity JSON)."""
+    if not (PROFILE / "seq.json").exists():
+        sys.exit(f"run first: python scripts/bs.py toc {base} {ou}")
+    host = json.loads((PROFILE / "seq.json").read_text())["host"]
+    pg, net = c.new_page(), []
+    seen = lambda: any(f"/activity/{aid}?" in u and "sequences.api" in u for u, _ in net)
+    pg.on("response", lambda r: net.append((r.url, r)))  # bodies are read later: reading inside the handler fails
+    pg.goto(f"{base}/d2l/le/enhancedSequenceViewer/{ou}?url=https%3A%2F%2F{host}%2F{ou}%2Factivity%2F{aid}%3FfilterOnDatesAndDepth%3D1",
+            wait_until="domcontentloaded")  # not networkidle: some topic pages (zip previews) never go idle
+    for attempt in range(2):  # the activity response is occasionally missed on the first load: reload once
+        for _ in range(30):
+            if seen() or "login" in pg.url:
+                break
+            time.sleep(0.5)
+        if seen() or "login" in pg.url:
+            break
+        pg.reload(wait_until="domcontentloaded")
+    time.sleep(6)  # players inject late
+    if "login.microsoftonline" in pg.url or "/d2l/login" in pg.url:
+        sys.exit(f"session expired: python scripts/bs.py login {base}")
+    act = next((j for u, r in net if f"/activity/{aid}?" in u and "sequences.api" in u and (j := hosts.safe_json(r))), {})
+    return pg, net, act
+
+
+def file_links(e, out=None):
+    """All (href, filename) download links under a file entity of an activity JSON; enforced-content link first."""
+    out = [] if out is None else out
+    if "file" in e.get("class", []):
+        ls = sorted(e.get("links", []), key=lambda l: "embed" not in l.get("class", []))
+        out += [(l["href"], e.get("properties", {}).get("name")) for l in ls if "alternate" in l.get("rel", []) and l["href"].startswith("http")]
+    for s in e.get("entities", []):
+        file_links(s, out)
+    return out
+
+
 def main(cmd, base, *a):
     base = base.rstrip("/")
     with sync_playwright() as p:
@@ -61,6 +113,7 @@ def main(cmd, base, *a):
                 time.sleep(2)
                 if host in pg.url and "/d2l/" in pg.url:
                     STATE.write_text(json.dumps(c.cookies()))
+                    CONFIG.write_text(json.dumps({"base": base}))
                     print("logged in, session saved", flush=True)
                     break
             return c.close()
@@ -86,59 +139,51 @@ def main(cmd, base, *a):
             out.mkdir(parents=True, exist_ok=True)
             (out / "toc.md").write_text(f"# {root['properties']['title']}\n\n" + "\n".join(walk_seq(root)) + "\n", encoding="utf-8")
             print(f"wrote {out / 'toc.md'}")
-        elif cmd == "video":  # video <base> <ou> <activityId> <outdir>: YuJa captions (.srt) + HLS url
+        elif cmd == "video":
             ou, aid, outdir = a
-            host = json.loads((PROFILE / "seq.json").read_text())["host"]
-            pg = c.new_page()
-            src = {}
-            pg.on("response", lambda r: src.update(j=r.json()) if "/P/Data/VideoSource" in r.url and "j" not in src else None)
-            pg.goto(f"{base}/d2l/le/enhancedSequenceViewer/{ou}?url=https%3A%2F%2F{host}%2F{ou}%2Factivity%2F{aid}%3FfilterOnDatesAndDepth%3D1",
-                    wait_until="networkidle")
-            time.sleep(6)
-            fr = next((f for f in pg.frames if "yuja.com/V/Video" in f.url), None)
-            if not fr:
-                sys.exit("no YuJa player on this topic (not a video?)")
-            for label in ("Play from beginning", "Resume from"):  # resume prompt (only if partly watched) blocks playback
-                try:
-                    fr.get_by_text(label).first.click(timeout=1500)
-                    break
-                except Exception:
-                    pass
-            # VideoSource JSON lists the caption file path (e.g. /P/DataPage/CaptionFile/4691_English.srt)
-            t = [v for k, v in src.get("j", {}).get("captionURL", {}).items() if v.endswith(".srt")][:1]
+            pg, net, _ = open_activity(c, base, ou, aid)
+            x = type("Ctx", (), {"pg": pg, "c": c, "net": net})()
+            hit = next((h for ad in hosts.ADAPTERS if (h := ad(x))), None)
+            if not hit:
+                sys.exit("no video found on this topic (is it a file/quiz/link?)")
             o = Path(outdir)
             o.mkdir(parents=True, exist_ok=True)
-            if t:
-                (o / "video.en.srt").write_text(fr.evaluate("u => fetch(u).then(r => r.text())", t[0]), encoding="utf-8")
-            else:
-                print("no caption file listed (no soft subs?)")
-            hls = next(iter(src.get("j", {}).get("streams", [{}])[0].get("typeAndVideoSourceMap", {}).values()), {})
-            m3u8 = hls.get("fileURL", "")
-            (o / "source.txt").write_text(m3u8)
-            print(json.dumps({"title": pg.title(), "srt": bool(t), "m3u8": bool(m3u8), "dir": str(o)}))
+            for name, text in hit["subs"].items():
+                (o / name).write_text(text, encoding="utf-8")
+            (o / "source.txt").write_text(hit["source"])
+            if hit["host"] == "embed":  # yt-dlp needs the login cookies to open these
+                write_cookies(c)
+            print(json.dumps({"title": pg.title(), "host": hit["host"], "subs": list(hit["subs"]), "source": bool(hit["source"]), "dir": str(o)}))
+        elif cmd == "doc":
+            ou, aid, outdir = a
+            pg, _, act = open_activity(c, base, ou, aid)
+            links = file_links(act)
+            if not links:
+                sys.exit("no downloadable file on this topic (not a file-activity?)")
+            href, name = links[0]
+            r = c.request.get(href)
+            if not r.ok:
+                sys.exit(f"download failed: HTTP {r.status}")
+            o = Path(outdir)
+            o.mkdir(parents=True, exist_ok=True)
+            f = o / (name or unquote(href.split("?")[0].rsplit("/", 1)[-1]))
+            f.write_bytes(r.body())
+            print(json.dumps({"file": str(f), "bytes": f.stat().st_size}))
         elif cmd == "page":
             ou, tid = a
             pg = c.new_page()
             pg.goto(f"{base}/d2l/le/content/{ou}/viewContent/{tid}/View", wait_until="networkidle")
-            time.sleep(3)  # players inject late
+            time.sleep(3)
             js = """() => ({
               title: document.title,
               text: document.body.innerText.slice(0, 20000),
               iframes: [...document.querySelectorAll('iframe')].map(f => f.src),
-              videos: [...document.querySelectorAll('video,source')].map(v => v.currentSrc || v.src),
-              tracks: [...document.querySelectorAll('track')].map(t => ({src: t.src, label: t.label, lang: t.srclang})),
               links: [...document.querySelectorAll('a[href]')].map(a => [a.innerText.trim(), a.href]).filter(x => x[0]).slice(0, 80)
             })"""
             print(json.dumps(pg.evaluate(js), indent=1))
         elif cmd == "cookies":
-            api_version(c, base)  # fail early if logged out
-            lines = ["# Netscape HTTP Cookie File"]
-            for k in c.cookies():
-                lines.append("\t".join([k["domain"], str(k["domain"].startswith(".")).upper(), k["path"],
-                                        str(k["secure"]).upper(), str(int(k["expires"])) if k["expires"] > 0 else "0",
-                                        k["name"], k["value"]]))
-            (ROOT / "cookies.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
-            print("wrote cookies.txt (gitignored)")
+            api_version(c, base)
+            write_cookies(c)
         else:
             sys.exit(__doc__)
         c.close()

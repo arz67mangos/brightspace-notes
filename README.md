@@ -1,39 +1,78 @@
 ﻿# brightspace-notes
 
-A Claude Code skill that turns the Brightspace (D2L) course material **you are enrolled in** into revision notes (`notes/<course>/<module>/<topic>.md`) that you, or another Claude agent, can revise from.
+A [Claude Code](https://claude.com/claude-code) skill that turns the Brightspace (D2L) course material **you are enrolled in** into revision notes you can study from, quiz yourself on, or hand to another Claude agent.
 
-It only fetches what you ask for: it lists the course outline, asks which modules/topics you want, and processes just those.
+It is **scoped on purpose**: it lists the course outline, asks which modules/topics you want, and processes only those. It never touches quizzes.
 
-## What it does
-- Logs in through a real browser window you sign into yourself (SSO/MFA works). Your password is never seen by the scripts.
-- Lists the course outline (modules, topics, IDs).
-- For videos: pulls the soft-subtitle transcript, and grabs keyframes at slide changes so Claude can read slides, diagrams and hard-subbed text.
-- Claude then writes a dense note per topic: key ideas, details, exam points, self-check questions, gaps.
+## What you get
+| Capture | Result |
+|---|---|
+| Lecture videos | Transcript from the video's own subtitles (speech-to-text if there are none), **one frame per distinct slide** (including each step of a diagram being drawn), contact sheets, and `slides.md`: each slide next to the narration spoken over it |
+| Documents (PDF, Word, PowerPoint, zip) | Converted to markdown; scanned/diagram pages saved as images |
+| Notes | One `.md` per topic: key ideas, details, exam points, self-check Q&A, gaps. Every `[mm:ss]` reference links to the slide on screen at that moment, labelled with the video it came from |
+| Revision extras | Anki flashcards, exam-focus sheet, glossary, per-module cheat sheets, quiz mode, tutorial-sheet helper |
 
-## Setup
-Requires Python 3, ffmpeg on PATH, and [Claude Code](https://claude.com/claude-code).
+Everything lands in `notes/` on your machine (gitignored: it is your institution's material, keep it personal).
+
+## Install
+Needs Python 3.10+ and git. Then, from this folder:
 
 ```bash
-pip install yt-dlp playwright webvtt-py faster-whisper
-python -m playwright install chromium
+# Windows
+powershell -ExecutionPolicy Bypass -File install.ps1
+# macOS / Linux
+sh install.sh
 ```
+This installs the Python packages, Chromium (for the login window), ffmpeg, switches on the privacy hook, and runs the doctor. It is safe to run again.
 
-Open Claude Code in this folder (the skill in `.claude/skills/brightspace-notes/` loads automatically) and say, for example:
+## Use it
+Open Claude Code **in this folder** (the skills in `.claude/skills/` load automatically) and just ask, e.g.:
 
-> Make revision notes for Topic 2 and 3 of my course at https://YOUR-SCHOOL.brightspace.com/d2l/home/123456
+> Make revision notes for Topic 2 of my course: https://YOUR-SCHOOL.brightspace.com/d2l/home/123456
 
-It will run `scripts/bs.py login`, open Chromium for you to sign in, show the outline and ask which topics you want.
+Claude will:
+1. run `scripts/bs.py login`: a Chromium window opens, **you sign in yourself** (SSO/MFA fine). Your password never touches the scripts; the session is saved to `.profile/` (gitignored). Re-login when it expires.
+2. list the modules and **ask which topics you want**. Anything you don't pick is never opened.
+3. fetch the videos/documents of those topics, read the slides and narration, and write the notes.
 
-## Scripts
-- `scripts/bs.py login|toc|video|page|cookies` - login, outline, YuJa video captions + stream URL, page dump, cookie export.
-- `scripts/video.py` - transcript from captions + ffmpeg keyframes (scene change, at least one per 45 s).
+Other things you can ask: *"quiz me on Topic 2"* (skill `brightspace-quiz`, tracks what you get wrong), *"attempt this tutorial sheet from my notes"* (skill `brightspace-tutorial`, shows which note each answer came from and lists its assumptions), *"make an exam-focus sheet / glossary / cheat sheet"*, *"export Anki cards"*.
 
-## Limits
-- Video fetching (`bs.py video`) is built for **YuJa** players and tested on one institution (Microsoft SSO). Other players (Panopto, Kaltura, YouTube) work through `video.py` with a URL you find, but need a little manual help; PRs welcome.
-- Captions are usually auto-generated: expect small errors in terms and names. Videos with no captions are transcribed locally with faster-whisper (slower, and jargon gets misheard: use `--whisper-model small.en`).
-- Opening a topic marks it as viewed in Brightspace.
+## Check your setup: `doctor`
+```bash
+python scripts/doctor.py
+```
+Checks Python, ffmpeg, git, every Python package, Playwright's Chromium, the privacy hook, and your Brightspace login, and prints the exact command to fix anything missing.
 
-## Please be responsible
-Use only courses you're enrolled in. Notes derive from your institution's material: keep them for personal study (`notes/` is gitignored) and don't redistribute course content. `.profile/` holds your login session: never share or commit it.
+## Privacy guard
+`.githooks/pre-commit` (enabled by the installer; or `git config core.hooksPath .githooks`) **refuses any commit containing** `notes/`, `.profile/`, `work/` or cookie files, so you can't push your login session or course material by accident. `.gitignore` covers the same paths. Please don't bypass it with `--no-verify`.
 
-MIT licensed.
+## Commands (what Claude runs for you)
+| Command | Does |
+|---|---|
+| `bs.py login <base>` | manual sign-in window, saves session |
+| `bs.py toc <base> <ou>` | course outline with activity IDs -> `notes/<ou>/toc.md` |
+| `bs.py video <base> <ou> <id> <dir>` | finds the player (host adapters), saves captions + stream URL |
+| `bs.py doc <base> <ou> <id> <dir>` | downloads a file topic |
+| `video.py <url\|file> <dir>` | transcript + slide frames + `slides.md` (+ speech-to-text if no subs) |
+| `docs.py <file> <dir>` | pdf/docx/pptx/zip -> markdown (+ page images) |
+| `linkify.py <note.md>` | turns `[mm:ss]` / `[P2 mm:ss]` into links to the slide frame |
+| `anki.py <notes> out.tsv` | self-check questions -> Anki import file |
+| `rollup.py <course notes>` | `EXAM_FOCUS.md`, `GLOSSARY.md`, per-module `CHEATSHEET.md` |
+| `doctor.py` | setup check |
+
+`<ou>` = the number in your course URL `/d2l/home/<ou>`.
+
+## Not missing slides
+Videos are sampled every 2 s (not "scene detection") and a frame is kept whenever the picture changes by more than a small threshold, ignoring the bottom strip where burned-in subtitles sit. Result: every slide, and each step of an animation, gets a frame. Tune with `video.py --sim 0.02` (catch tinier changes) or `--sim 0.06` (fewer near-duplicates), `--step 1` for fast-moving videos.
+
+## Limits (please read)
+- **Video hosts:** `bs.py video` is **tested on YuJa** at one institution (Microsoft SSO). Adapters for YouTube/Vimeo/Panopto/Kaltura embeds (via yt-dlp) and a generic network sniffer exist but are **untested**; if yours fails, see [CONTRIBUTING.md](CONTRIBUTING.md): adding a host is one small function, and PRs are very welcome.
+- Captions are usually auto-generated: expect small errors in terms and names. The skill cross-checks terms against the slides, and notes list corrections under "Gaps". Speech-to-text (no-subtitle videos) is weaker on jargon: use `--whisper-model small.en`.
+- `.pptx` files give text only unless LibreOffice is installed (then slides are rendered); symbol-font arrows in Word handouts can come through blank.
+- Opening a topic marks it as viewed in Brightspace. Students can't use Brightspace's content API (403), so the outline comes from the same Lessons data the web page loads.
+- Written for students: it only reads what your account can already see.
+
+## Be responsible
+Use only courses you're enrolled in, for your own study. Don't share the generated notes or media beyond what your institution allows. `.profile/` is your login session: never share it.
+
+MIT licensed. Contributions: [CONTRIBUTING.md](CONTRIBUTING.md).

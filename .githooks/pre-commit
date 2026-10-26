@@ -1,0 +1,10 @@
+#!/bin/sh
+# Privacy guard: refuse commits that include your notes, login session, cookies or scratch downloads.
+# Enabled by install.ps1/install.sh (git config core.hooksPath .githooks). Bypass only on purpose: git commit --no-verify
+bad=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(notes/|\.profile/|work/)|(^|/)cookies\.(txt|json)$' | grep -v '^notes/\.gitkeep$')
+if [ -n "$bad" ]; then
+  echo "BLOCKED: these files are personal/course data and must not be committed:" >&2
+  echo "$bad" | sed 's/^/  /' >&2
+  echo "Unstage with: git restore --staged <file>" >&2
+  exit 1
+fi

@@ -1,56 +1,67 @@
 ---
 name: brightspace-notes
-description: Read and navigate a Brightspace (D2L) course, watch its videos via subtitles + scene-change keyframes, and write revision notes as .md files per module. Use when the user asks to capture, summarise, or make revision notes from Brightspace/e-learning material or lecture videos.
+description: Read and navigate a Brightspace (D2L) course, capture its lecture videos (subtitles + one frame per slide) and documents, and write revision notes as .md files per topic with timestamp-linked slide references. Use when the user asks to capture, summarise, or make revision notes from Brightspace/e-learning material or lecture videos.
 ---
 
 # Brightspace -> revision notes
 
-Repo root = the folder containing `scripts/` and `notes/`. Run all commands from it. Notes go to `notes/<course>/<module>/<topic>.md`.
+Repo root = the folder containing `scripts/` and `notes/`. Run everything from it. Notes: `notes/<course>/<module>/<topic>.md`; each topic's captured media: `notes/<course>/<module>/assets/<slug>/` (all gitignored).
+Related skills: `brightspace-tutorial` (answer tutorial sheets from the notes), `brightspace-quiz` (quiz the user from the notes).
 
-## 0. Setup (once)
-- `pip install yt-dlp playwright webvtt-py faster-whisper && python -m playwright install chromium`; `ffmpeg` on PATH.
-- `python scripts/bs.py login <base-url>` — opens Chromium; the user logs in manually (SSO/MFA). The script detects the Brightspace home page, saves the session to `.profile/` (gitignored) and exits by itself. Run it in the background; re-run when the session expires.
+## 0. Setup
+- First time / something broken: `python scripts/doctor.py` prints exactly what's missing and the fix. `install.ps1` (Windows) / `install.sh` (Mac/Linux) set everything up.
+- `python scripts/bs.py login <base-url>`: opens Chromium, the user signs in (SSO/MFA), the script saves the session and exits by itself. Run it in the background and tell the user to sign in. Re-run when the session expires (symptom: redirect to a login page).
 
-## 1. Navigate
-**Scope first, never crawl everything.** Ask the user for the Brightspace base URL (e.g. `https://school.brightspace.com`) and course, or the topic/module they want (a pasted course URL contains the orgUnitId: `/d2l/home/<id>`). Run `toc` (cheap, one request), show the module list, and ask which modules or topics they want (AskUserQuestion, multi-select). Process only those. Skip quizzes, surveys, assignment dropboxes, group lists, external links and anything not asked for. Re-use existing `notes/*/toc.md` instead of re-fetching.
-- **Scripted (fast, bulk):** `python scripts/bs.py toc <base> <ou>` writes `notes/<ou>/toc.md`: every module and topic with its activity ID and kind (`link-activity` = usually a YuJa video or quiz, `file-activity` = document). The `/d2l/api/le/.../content/toc` API is 403 for students, so this uses the Lessons sequence API the page itself calls.
-- **Session expired / redirected to login.microsoftonline.com?** Re-run `python scripts/bs.py login <base>`: a Chromium window opens, the user signs in (MFA), the script saves cookies to `.profile/cookies.json` and exits by itself. Always run it in the background and tell the user to sign in.
-- **Claude in Chrome (interactive):** use the `chrome-browser` skill for one-off pages or when the scripted route breaks.
-
-Documents (`file-activity`): open `{base}/d2l/le/enhancedSequenceViewer/<ou>?url=https%3A%2F%2F<host>%2F<ou>%2Factivity%2F<id>%3FfilterOnDatesAndDepth%3D1` (host is in `.profile/seq.json`) or use Chrome, download, then read with the PDF skill. Save originals under `work/`, not `notes/`.
+## 1. Scope first: never crawl everything
+Ask for the base URL and course (or topic). A pasted course URL contains the orgUnitId (`/d2l/home/<id>`). Run `python scripts/bs.py toc <base> <ou>` (one request, writes `notes/<ou>/toc.md` with every module/topic, its activity ID, and kind), show the modules, and ask which ones they want (AskUserQuestion, multi-select). Process only those.
+- **Never open, fetch or answer anything quiz-like**: quizzes, prep quizzes, surveys, assignment dropboxes. The user does those themselves. Also skip group lists, external links, anything not asked for.
+- Reuse an existing `toc.md` instead of re-fetching. `link-activity` = usually a video (or a quiz: check the title), `file-activity` = a document.
+- Interactive alternative or when scripts break: Claude in Chrome (`chrome-browser` skill).
 
 ## 2. Videos
-`bs.py video` is written for **YuJa** players (tested at one institution). Other hosts (Panopto, Kaltura, YouTube...): find the video/caption URL with the generic route in step 5, then run `video.py` on it.
-1. `python scripts/bs.py video <base> <ou> <activityId> work/<slug>` → `video.en.srt` (YuJa's soft-subtitle file, usually auto-generated, so expect small errors in terms; this works for videos with no hard subs) + `source.txt` (signed HLS .m3u8, expires in about an hour). Opening a topic marks it viewed in Brightspace.
-2. `python scripts/video.py "$(cat work/<slug>/source.txt)" work/<slug>` → `transcript.md` (timestamped) + `frames/*.jpg` at scene changes + `frames.txt` (times). Raise `--scene` (0.15) if too many frames, lower (0.05) if slides are missed. Other hosts: pass any URL/file; `--cookies cookies.txt` (from `bs.py cookies`) for auth-gated hosts.
-3. **Read `transcript.md` first**, then **view the frames** (Read tool on the jpgs) for slide text, diagrams, code, formulas, and hard-sub text the transcript lacks. Match frames to transcript by timestamp.
-4. No subtitle file at all: `video.py` automatically transcribes the audio with faster-whisper (CPU, `base.en`; first run downloads the model). It mishears jargon ("demand" -> "D-man"), so pass `--whisper-model small.en` for coursework and cross-check terms against the slide frames.
-5. Host not supported by yt-dlp (custom player): in Chrome, `read_network_requests` for `.m3u8/.mp4/.vtt` URLs and feed those to `video.py`. Soft subs often appear as a `.vtt` request when captions are toggled on.
+1. `python scripts/bs.py video <base> <ou> <activityId> notes/<course>/<module>/assets/<slug>`: finds the player through the adapters in `scripts/hosts.py` (YuJa is tested; YouTube/Vimeo/Panopto/Kaltura embeds and generic sniffing are untested), writes the caption file and `source.txt` (signed stream URL, expires in about an hour).
+2. `python scripts/video.py "$(cat <dir>/source.txt)" <dir>` then delete `source.txt`. Produces:
+   - `slides.md`: one section per distinct slide: frame link + the narration said while it was on screen. **Start here.**
+   - `sheets/sheetNN.jpg`: contact sheets of 4 slides each, labelled `#n mm:ss`. **Read these to see every slide cheaply**, then open single `frames/` jpgs for small print, graphs and tables.
+   - `transcript.md`, `frames.txt` (file, start, end, sheet cell).
+   - Slides are not missed: the video is sampled every 2 s and a frame kept whenever the picture changes (captions at the bottom are ignored). If bullets appearing one at a time are being missed, rerun with `--sim 0.02`; if too many near-duplicates, `--sim 0.06`. Topics with 2+ videos: one asset folder each.
+3. Subtitles: soft subs are used when they exist. If a video has none, `video.py` transcribes the audio with faster-whisper (`--whisper-model small.en` is better for coursework).
+4. **Fix transcript errors**: captions are ASR. Cross-check every term against the slide text in the frames (and the lecture-notes document if captured). Correct the term in the note and list the correction under Gaps (e.g. "demand" misheard as "D-man"). Treat lines that contradict the slide as ASR errors.
+5. Other hosts: if `bs.py video` finds nothing, see CONTRIBUTING.md (add an adapter) or in Chrome use `read_network_requests` to find the `.m3u8/.mp4/.vtt` URLs and pass them to `video.py`.
 
-## 3. Write the note
-One file per topic, this shape (keep it dense; the note is for revision and for other agents to consume):
+## 3. Documents (`file-activity`)
+`python scripts/bs.py doc <base> <ou> <activityId> work/<slug>` downloads the file; then `python scripts/docs.py <file> notes/<course>/<module>/assets/<slug>` converts pdf/docx/pptx/zip to markdown (+ page images for scanned/diagram pages, or all pages with `--images`). Read the `.md`; view page images for diagrams. Lecture-notes documents are the authority for terminology and model diagrams. Don't answer assessed/quiz-like material.
+
+## 4. Write the note
+One file per topic. Front matter lists the videos so citations can be turned into frame links:
 
 ```
 ---
 course: <name>
 module: <name>
 topic: <title>
-source: <brightspace url> (+ video url)
+source: Brightspace activity <id>
 captured: <YYYY-MM-DD>
+video: P1 | Part 1 Law of Demand | assets/part1
 ---
 # <Topic>
-## Key ideas        (bullets, definitions in own words)
-## Details          (formulas, code, diagrams-as-text, worked examples; cite [mm:ss] for video claims)
+## Key ideas        (bullets; **bold** each key term: they feed GLOSSARY.md)
+## Details          (formulas, worked examples, diagrams as text; cite the video time: [02:10] or [02:10-02:40])
 ## Likely exam/test points
-## Self-check questions (5-10 Q&A)
-## Gaps              (what was unreadable/missing: no subs, blurry frame, etc.)
+## Self-check questions
+1. Question? *Short answer*
+## Gaps              (ASR corrections, unreadable frames, anything not captured)
 ```
+- Cite video times as `[mm:ss]` / `[mm:ss-mm:ss]`; with 2+ videos in the note write `[P2 02:10]`. Then run `python scripts/linkify.py <note.md>`: each cite becomes a link to the slide on screen at that time (`[Part 1 @02:10](assets/part1/frames/f003_...jpg)`), so the user can jump back to the slide.
+- Self-check questions MUST be `N. Question? *answer*` (answer in italics, last): that is what `anki.py` exports.
+- Never invent content that isn't in the transcript/frames/documents. Unknowns go under Gaps.
+- Update `notes/<course>/INDEX.md` (one line per note).
 
-Then update `notes/<course>/INDEX.md` (one line per note: link + 1-sentence summary). Never invent content not in the transcript/frames/pages; put unknowns under Gaps.
-
-## 4. Revision
-Point an agent at `notes/<course>/<module>/` and ask it to quiz from "Self-check questions" or explain from "Key ideas".
+## 5. Revision outputs (on request)
+- `python scripts/rollup.py notes/<course>` -> `EXAM_FOCUS.md` (all exam points), `GLOSSARY.md` (all bold terms), per-module `CHEATSHEET.md`. Offer to tighten a cheat sheet into a one-page summary.
+- `python scripts/anki.py notes/<course> anki-cards.tsv` -> import in Anki (File > Import).
+- Quizzing and tutorial help: skills `brightspace-quiz` and `brightspace-tutorial`.
 
 ## Rules
-- Only access courses the user is enrolled in; don't bulk-redistribute material. `.profile/` and `cookies.txt` are credentials — never commit or print them.
-- Ask before downloading large files in bulk; work module by module.
+- Only courses the user is enrolled in. Don't redistribute course material; `notes/`, `.profile/`, `cookies.*` and `work/` are personal and gitignored. Never print or commit credentials; don't bypass the pre-commit hook.
+- Ask before downloading in bulk; work module by module. Opening a topic marks it viewed in Brightspace.

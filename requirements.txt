@@ -1,0 +1,9 @@
+yt-dlp
+playwright
+webvtt-py
+faster-whisper
+numpy
+pillow
+pymupdf
+python-docx
+python-pptx
