@@ -9,9 +9,14 @@ Anki: File > Import, pick the .tsv; fields = Front, Back, Tags (course::module::
 import re, sys
 from pathlib import Path
 
+import env  # noqa: F401  (UTF-8 output, PATH refresh)
+
 CARD = re.compile(r"^\s*\d+\.\s+(.*?)\s+\*([^*]+)\*\s*$")
 target = Path(sys.argv[1] if len(sys.argv) > 1 else sys.exit(__doc__))
-dest = Path(sys.argv[2]) if len(sys.argv) > 2 else Path("anki-cards.tsv")
+if not target.exists():
+    sys.exit(__doc__)
+# default next to the notes (gitignored), not in the repo root where `git add .` would pick the cards up
+dest = Path(sys.argv[2]) if len(sys.argv) > 2 else (target if target.is_dir() else target.parent) / "anki-cards.tsv"
 notes = [target] if target.is_file() else sorted(target.rglob("*.md"))
 rows, skipped = [], 0
 for n in notes:

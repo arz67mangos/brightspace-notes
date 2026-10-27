@@ -2,6 +2,8 @@
 cookies.txt
 work/
 __pycache__/
+.venv/
+*.tsv
 # your notes/course material stay local (copyright + personal); remove these two lines to version your notes
 notes/*
 !notes/.gitkeep
