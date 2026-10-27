@@ -37,7 +37,7 @@ mmss = lambda s: f"{int(s) // 60:02d}:{int(s) % 60:02d}"
 
 if re.match(r"https?://", src) and ".m3u8" not in src:  # m3u8/mp4 manifests: ffmpeg reads them directly
     cmd = [sys.executable, "-m", "yt_dlp", "-f", "best[height<=720]/best", "--write-subs", "--write-auto-subs",
-           "--sub-langs", "en.*,en", "--sub-format", "vtt", "-o", str(out / "video.%(ext)s"), src]
+           "--sub-langs", "en,en-orig,en-US,en-GB,en-en,en-en-US", "--sub-format", "vtt", "-o", str(out / "video.%(ext)s"), src]
     if a.cookies:
         cmd[3:3] = ["--cookies", a.cookies]
     subprocess.run(cmd, check=True)
