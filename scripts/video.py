@@ -20,7 +20,11 @@ from pathlib import Path
 import webvtt
 from PIL import Image, ImageDraw, ImageFont
 
-ap = argparse.ArgumentParser()
+import env  # noqa: F401  (UTF-8 output, PATH refresh)
+
+if not shutil.which("ffmpeg"):
+    sys.exit("ffmpeg not found: run python scripts/doctor.py for the install command (then open a new terminal)")
+ap =argparse.ArgumentParser()
 ap.add_argument("src")
 ap.add_argument("out")
 ap.add_argument("--cookies")

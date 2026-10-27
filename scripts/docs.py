@@ -8,10 +8,12 @@ are rendered to <outdir>/<name>_pages/pNN.jpg so Claude can look at them. .pptx:
 if LibreOffice (soffice) is installed it is converted to PDF first so slides can be rendered too.
 Downloaded files are untrusted: zip entries are path-checked, nothing is executed.
 """
-import argparse, shutil, subprocess, sys, zipfile
+import argparse, re, shutil, subprocess, sys, zipfile
 from pathlib import Path
 
-ap = argparse.ArgumentParser()
+import env  # noqa: F401  (UTF-8 output, PATH refresh)
+
+ap =argparse.ArgumentParser()
 ap.add_argument("file")
 ap.add_argument("out")
 ap.add_argument("--images", action="store_true")
@@ -117,7 +119,7 @@ def html_(path):
 
     p = P()
     p.feed(path.read_text(encoding="utf-8", errors="replace"))
-    body = " ".join("".join(p.text).split(" ")).strip()
+    body = re.sub(r"\n\s*\n+", "\n\n", re.sub(r"[ \t\r\xa0]+", " ", "".join(p.text))).strip()  # HTML whitespace is not layout
     links = "\n".join(f"- {l}" for l in dict.fromkeys(p.links))
     return f"# {path.name}\n\n{body}\n" + (f"\n## Links on this page\n{links}" if links else "")
 
@@ -139,7 +141,7 @@ def handle(path):
     if fn:
         text = fn(path)
     elif s in (".txt", ".md"):
-        text = path.read_text(errors="replace")
+        text = path.read_text(encoding="utf-8", errors="replace")
     else:
         print(f"skipped (unsupported): {path.name}")
         return

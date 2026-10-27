@@ -30,7 +30,7 @@ def yuja(x):
         except Exception:
             continue
     cap = [v for v in j.get("captionURL", {}).values() if isinstance(v, str) and v.endswith(".srt")][:1]
-    hls = next(iter(j.get("streams", [{}])[0].get("typeAndVideoSourceMap", {}).values()), {})
+    hls = next(iter((j.get("streams") or [{}])[0].get("typeAndVideoSourceMap", {}).values()), {})
     subs = {"video.en.srt": fr.evaluate("u => fetch(u).then(r => r.text())", cap[0])} if cap else {}
     return {"host": "yuja", "source": hls.get("fileURL", ""), "subs": subs}
 

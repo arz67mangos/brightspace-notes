@@ -10,6 +10,8 @@ Result: [Part 1 @02:10](assets/part1/frames/f003_02m05s.jpg)
 import re, sys
 from pathlib import Path
 
+import env  # noqa: F401  (UTF-8 output, PATH refresh)
+
 CITE = re.compile(r"\[(?:([A-Za-z0-9]+)\s+)?(\d{1,2}):(\d{2})(?:\s*-\s*\d{1,2}:\d{2})?\](?!\()")
 
 
@@ -52,4 +54,4 @@ def linkify(note: Path):
 
 
 for n in sys.argv[1:] or sys.exit(__doc__):
-    linkify(Path(n))
+    linkify(Path(n)) if Path(n).is_file() else print(f"{n}: no such note, skipped")

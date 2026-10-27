@@ -17,6 +17,7 @@ from urllib.parse import unquote
 from playwright.sync_api import sync_playwright
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import env  # noqa: F401  (UTF-8 output, PATH refresh)
 import hosts
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -209,11 +210,14 @@ def main(cmd, base, *a):
 
             for _ in range(300):  # no stdin under agents: wait until SSO lands back on Brightspace's home
                 pg.wait_for_timeout(2000)  # not time.sleep: it blocks Playwright's event loop
-                if any(host in u and "/d2l/" in u for u in urls()):  # any tab: sign-in may finish in another one
+                # any tab: sign-in may finish in another one. /d2l/login (schools with a local login form) is not "in" yet
+                if any(host in u and "/d2l/" in u and "login" not in u.lower() for u in urls()):
                     STATE.write_text(json.dumps(c.cookies()))
                     save_settings(base=base)
                     print("logged in, session saved", flush=True)
                     break
+            else:
+                print(f"not signed in after 10 minutes; run again: python scripts/bs.py login {base}", flush=True)
             return c.close()
         c = ctx(p)
         if cmd == "toc":  # student accounts get 403 on /d2l/api/le/.../content/toc, so use the Lessons sequence API
@@ -280,7 +284,8 @@ def main(cmd, base, *a):
                 sys.exit(f"download failed: HTTP {r.status}")
             o = Path(outdir)
             o.mkdir(parents=True, exist_ok=True)
-            f = o / (name or unquote(href.split("?")[0].rsplit("/", 1)[-1]))
+            # the name comes from the server: keep a plain file name (no folders, no characters Windows forbids)
+            f = o / (re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name or unquote(href.split("?")[0].rsplit("/", 1)[-1])).strip(" .") or "download")
             f.write_bytes(r.body())
             log_capture(ou, aid, "doc", True, file=str(f), bytes=f.stat().st_size, dir=str(o))
             print(json.dumps({"file": str(f), "bytes": f.stat().st_size}))
@@ -304,7 +309,9 @@ def main(cmd, base, *a):
         c.close()
 
 
+ARGS = {"login": 0, "toc": 1, "video": 3, "doc": 3, "page": 2, "cookies": 0, "mode": 0}  # arguments after <base>
+
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 3 or len(sys.argv) - 3 != ARGS.get(sys.argv[1]):
         sys.exit(__doc__)
     main(*sys.argv[1:])

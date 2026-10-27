@@ -16,8 +16,10 @@ import json, re, sys
 from pathlib import Path
 from urllib.parse import unquote
 
+import env  # noqa: F401  (UTF-8 output, PATH refresh)
+
 ROOT = Path(__file__).resolve().parent.parent
-ou = sys.argv[1] if len(sys.argv) > 1 else sys.exit(__doc__)
+ou = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else sys.exit(__doc__)
 course = Path(sys.argv[2]) if len(sys.argv) > 2 else None
 base = ROOT / "notes" / ou
 toc = base / "toc.md"

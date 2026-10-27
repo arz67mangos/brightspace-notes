@@ -9,8 +9,10 @@ import re, sys
 from pathlib import Path
 from urllib.parse import quote
 
+import env  # noqa: F401  (UTF-8 output, PATH refresh)
+
 args = sys.argv[1:]
-if not args:
+if not args or not Path(args[0]).is_dir():
     sys.exit(__doc__)
 root = Path(args[0])
 ou = args[args.index("--ou") + 1] if "--ou" in args else None

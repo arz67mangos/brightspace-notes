@@ -11,7 +11,11 @@ Notes are the .md files two levels down (<course>/<module>/<topic>.md) that have
 import re, sys
 from pathlib import Path
 
+import env  # noqa: F401  (UTF-8 output, PATH refresh)
+
 root = Path(sys.argv[1] if len(sys.argv) > 1 else sys.exit(__doc__))
+if not root.is_dir():
+    sys.exit(__doc__)
 
 
 def section(text, title):
