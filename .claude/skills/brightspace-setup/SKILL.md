@@ -9,7 +9,8 @@ Run everything from the repo root (the folder with `scripts/`). Talk in plain la
 
 ## 1. Find a working Python
 Try `python --version`, then `py --version` (Windows), then `python3 --version` (Mac/Linux). Use the first that prints 3.10 or newer as `<py>` for every command below. On Windows a `python` that opens the Microsoft Store (or prints nothing) does not count.
-- None, or older than 3.10: stop here. Tell them to install Python 3.10+ from https://www.python.org/downloads/ (Windows: tick "Add python.exe to PATH"; Mac: or `brew install python`), then restart Claude Code in this folder and say "set it up" again. Don't install Python for them.
+- None, or older than 3.10, on Windows: ask first ("Python is missing: it runs all the scripts, about 30 MB. Install it?"), then run `winget install --id Python.Python.3.13 -e --scope user --accept-package-agreements --accept-source-agreements`. This session's PATH won't see it yet, so use the full path `$env:LOCALAPPDATA\Programs\Python\Python313\python.exe` (Git Bash: `"$LOCALAPPDATA/Programs/Python/Python313/python.exe"`) as `<py>` until Claude Code is reopened. If winget is missing or fails, tell them to install from https://www.python.org/downloads/ (tick "Add python.exe to PATH") and reopen Claude Code in this folder.
+- None, or older than 3.10, on Mac/Linux: tell them to install Python 3.10+ (python.org, or `brew install python`), then reopen Claude Code in this folder.
 - Mac/Linux: if a later `pip install` fails with "externally-managed-environment", offer a virtual environment: `python3 -m venv .venv` then use `.venv/bin/python` as `<py>` from then on (and tell them to run `. .venv/bin/activate` in their own terminal).
 
 ## 2. Check what's already there

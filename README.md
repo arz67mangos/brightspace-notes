@@ -15,14 +15,26 @@ It is **scoped on purpose**: it lists the course outline, asks which modules/top
 Everything lands in `notes/` on your machine (gitignored: it is your institution's material, keep it personal).
 
 ## Install
-### 1. Install the basics (once per computer, Windows)
+Two ways: let Claude Code do it for you (easiest), or follow the four steps yourself.
+
+### Easiest: ask Claude Code to do it
+1. Install **Git** (https://git-scm.com/download/win, default options; Claude Code on Windows needs it) and **Claude Code** (the Claude desktop app from https://claude.com/download, then the **Code** tab, or the terminal version from https://claude.com/claude-code).
+2. Open Claude Code in your **Documents** folder and paste this message:
+
+   > Clone https://github.com/arz67mangos/brightspace-notes.git into this folder. Then read `brightspace-notes/.claude/skills/brightspace-setup/SKILL.md` and follow it from inside the `brightspace-notes` folder: check what I have, install Python if it's missing, and ask me before installing anything.
+
+3. Claude clones the repo, tells you what's missing (with sizes), installs what you approve and opens the Brightspace sign-in window for you.
+4. When it's done, **close Claude Code and reopen it in the new `Documents\brightspace-notes` folder**. From then on always open it there; that's how it loads the skills.
+
+### Or step by step
+#### 1. Install the basics (once per computer, Windows)
 - **Python 3.10 or newer** from https://www.python.org/downloads/. In the installer, **tick "Add python.exe to PATH"** before clicking Install.
 - **Git** from https://git-scm.com/download/win (the default options are fine).
 - **Claude Code**: the Claude desktop app (https://claude.com/download, then the **Code** tab) or the terminal version (https://claude.com/claude-code).
 
 (If you're comfortable with a terminal: `winget install Python.Python.3.13` and `winget install Git.Git` do the first two.)
 
-### 2. Download this repo
+#### 2. Download this repo
 Open **PowerShell** (Start menu, type "PowerShell"), then copy-paste these two lines. They put the folder in your Documents:
 
 ```bash
@@ -33,13 +45,13 @@ You now have a folder `Documents\brightspace-notes`. To get updates later, run `
 
 *No git?* On the GitHub page click the green **Code** button > **Download ZIP**, then right-click the file > **Extract All**. This works, but you won't get updates with `git pull`, and the privacy guard (below) needs git, so cloning is better.
 
-### 3. Open the folder in Claude Code
+#### 3. Open the folder in Claude Code
 - Desktop app: in the **Code** tab, choose the `brightspace-notes` folder as the project folder.
 - Terminal: `cd $HOME\Documents\brightspace-notes`, then run `claude`.
 
 Always open Claude Code **in this folder**: that's how it finds the skills below.
 
-### 4. Set it up
+#### 4. Set it up
 **Easiest:** open Claude Code in this folder and type **`/brightspace-setup`** (or say "set this up"). Claude checks what you already have, tells you what's missing with sizes and the exact commands, installs only what you approve, then helps you sign in to Brightspace.
 
 Or install everything in one go, from this folder:
