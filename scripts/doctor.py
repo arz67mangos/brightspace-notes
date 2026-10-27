@@ -32,6 +32,7 @@ try:  # is Chromium downloaded for Playwright?
 except Exception as e:
     check("Playwright Chromium", False, "pip install playwright && python -m playwright install chromium", str(e)[:60])
 
+check("Deno (YouTube videos need a JavaScript runtime)", bool(shutil.which("deno")), "Windows: winget install DenoLand.Deno | Mac: brew install deno (then open a new terminal)", optional=True)
 hook = subprocess.run(["git", "config", "core.hooksPath"], capture_output=True, text=True, cwd=ROOT).stdout.strip()
 check("privacy pre-commit hook", hook == ".githooks", "git config core.hooksPath .githooks")
 soffice = shutil.which("soffice") or next((c for c in (r"C:\Program Files\LibreOffice\program\soffice.exe", r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",

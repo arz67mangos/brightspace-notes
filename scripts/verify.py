@@ -14,6 +14,7 @@ are not visible to your account until released.
 """
 import json, re, sys
 from pathlib import Path
+from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parent.parent
 ou = sys.argv[1] if len(sys.argv) > 1 else sys.exit(__doc__)
@@ -128,6 +129,14 @@ out.append("| Module | Captured |\n|---|---|\n" + "\n".join(f"| {k} | {a}/{b} |"
 out += tbl
 
 if course and course.exists():
+    vids = sorted(p.parent for p in course.rglob("frames.txt"))
+    if vids:  # videos that aren't topics in the outline (e.g. YouTube links on a module page) are checked too
+        out.append("\n## Videos found in the notes folders\n\n| Folder | Health |\n|---|---|")
+        for d in vids:
+            h = video_health(d)
+            out.append(f"| {d.relative_to(course).as_posix()} | {'; '.join(h)} |")
+            for flag in h[1:]:
+                problems.append(f"{d.relative_to(course).as_posix()}: {flag}")
     out.append("\n## Notes health\n")
     nh = []
     for note in sorted(course.rglob("*.md")):
@@ -135,7 +144,7 @@ if course and course.exists():
             continue
         t = note.read_text(encoding="utf-8")
         for target in re.findall(r"\]\((?!https?:)([^)#]+)\)", t):
-            if not (note.parent / target).exists():
+            if not (note.parent / unquote(target)).exists():  # links are URL-encoded (spaces as %20)
                 nh.append(f"{note.name}: broken link {target}")
         loose = len(re.findall(r"(?<![\[\(])\[\d{1,2}:\d{2}(?:-\d{1,2}:\d{2})?\](?!\()", t))
         if loose:

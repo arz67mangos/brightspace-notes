@@ -7,6 +7,9 @@ if ! command -v ffmpeg >/dev/null; then
   elif command -v apt-get >/dev/null; then sudo apt-get install -y ffmpeg
   else echo "Install ffmpeg manually, then re-run"; exit 1; fi
 fi
+if ! command -v deno >/dev/null; then  # YouTube downloads need a JS runtime
+  if command -v brew >/dev/null; then brew install deno; else echo "Optional: install Deno (https://deno.com) for YouTube videos"; fi
+fi
 python3 -m pip install -r requirements.txt
 python3 -m playwright install chromium
 git config core.hooksPath .githooks

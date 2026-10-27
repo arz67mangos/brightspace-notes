@@ -91,6 +91,31 @@ def walk_seq(e, depth=0, out=None):
     return out
 
 
+def html_to_md(h):
+    """Module descriptions are HTML: keep text, lists and links ([text](url)), drop the rest."""
+    import html as _h, re as _re
+
+    h = _re.sub(r"(?is)<(script|style).*?</\1>", "", h)
+    h = _re.sub(r'(?is)<a [^>]*href="([^"]+)"[^>]*>(.*?)</a>', lambda m: f"[{_re.sub('<[^>]+>', '', m.group(2)).strip()}]({m.group(1)})", h)
+    h = _re.sub(r"(?i)<li[^>]*>", "\n- ", h)
+    h = _re.sub(r"(?i)</p>|<br\s*/?>|</div>|</h\d>|</tr>", "\n", h)
+    return _re.sub(r"\n{3,}", "\n\n", _h.unescape(_re.sub(r"<[^>]+>", "", h))).strip()
+
+
+def module_intros(e, out=None):
+    """(module title, aid, description as markdown) for every module whose description isn't empty."""
+    out = [] if out is None else out
+    for s in e.get("entities", []):
+        if "sequence" in s.get("class", []):
+            d = html_to_md(s.get("properties", {}).get("description") or "")
+            aid = next((l["href"].split("/activity/")[1].split("?")[0] for l in s.get("links", [])
+                        if "self" in l.get("rel", []) and "/activity/" in l["href"]), "?")
+            if d:
+                out.append((s["properties"]["title"].strip(), aid, d))
+            module_intros(s, out)
+    return out
+
+
 def open_activity(c, base, ou, aid, player=False):
     """Load one topic in the sequence viewer. Returns (page, [(url, response)], activity JSON).
     Response bodies are NOT usable (Playwright drops them when the LTI launch navigates the frame): adapters
@@ -173,9 +198,18 @@ def main(cmd, base, *a):
             pg.goto(base)
             print("Log in (incl. MFA) in the browser window; waiting up to 10 min...", flush=True)
             host = base.split("//")[1]
+            def urls():  # live address of every tab (x.url alone goes stale unless Playwright is pumped)
+                out = []
+                for x in c.pages:
+                    try:
+                        out.append(x.evaluate("location.href"))
+                    except Exception:
+                        pass
+                return out
+
             for _ in range(300):  # no stdin under agents: wait until SSO lands back on Brightspace's home
-                time.sleep(2)
-                if host in pg.url and "/d2l/" in pg.url:
+                pg.wait_for_timeout(2000)  # not time.sleep: it blocks Playwright's event loop
+                if any(host in u and "/d2l/" in u for u in urls()):  # any tab: sign-in may finish in another one
                     STATE.write_text(json.dumps(c.cookies()))
                     save_settings(base=base)
                     print("logged in, session saved", flush=True)
@@ -202,7 +236,10 @@ def main(cmd, base, *a):
             out = ROOT / "notes" / ou
             out.mkdir(parents=True, exist_ok=True)
             (out / "toc.md").write_text(f"# {root['properties']['title']}\n\n" + "\n".join(walk_seq(root)) + "\n", encoding="utf-8")
-            print(f"wrote {out / 'toc.md'}")
+            intros = module_intros(root)
+            (out / "module-intros.md").write_text(f"# Module introduction pages: {root['properties']['title']}\n\n" + "\n\n".join(
+                f"## {t} ({a})\n\n{d}" for t, a, d in intros) + "\n", encoding="utf-8")
+            print(f"wrote {out / 'toc.md'} and module-intros.md ({len(intros)} module descriptions)")
         elif cmd == "video":
             ou, aid, outdir = a
             def find(c):

@@ -26,6 +26,7 @@ ap.add_argument("out")
 ap.add_argument("--cookies")
 ap.add_argument("--step", type=float, default=2.0)
 ap.add_argument("--sim", type=float, default=0.04)
+ap.add_argument("--keep-video", action="store_true")  # by default a video downloaded by yt-dlp is deleted after its frames are taken
 ap.add_argument("--whisper-model", default="base.en")  # only used when no subtitles exist; small.en is more accurate
 a = ap.parse_args()
 
@@ -44,18 +45,22 @@ if re.match(r"https?://", src) and ".m3u8" not in src:  # m3u8/mp4 manifests: ff
     if not vids:
         sys.exit("yt-dlp produced no video")
     src = str(vids[0])
+    downloaded = vids[0]
+else:
+    downloaded = None
 
 # ---- transcript: [(seconds, text)] ----
 subs = sorted([*out.glob("*.vtt"), *out.glob("*.srt")]) or sorted(Path(src).parent.glob(Path(src).stem + "*.vtt"))
 rows = []
 if subs:
-    last = ""
+    recent = []  # YouTube-style rolling captions repeat the previous line in every cue: keep each line once
     for cue in (webvtt.from_srt if subs[0].suffix == ".srt" else webvtt.read)(str(subs[0])):
-        t = " ".join(cue.text.split())
         h, m, s = cue.start.replace(",", ".").split(":")
-        if t and t != last:
-            rows.append((int(h) * 3600 + int(m) * 60 + float(s), t))
-            last = t
+        for ln in cue.text.split("\n"):
+            t = " ".join(ln.split())
+            if t and t not in recent:
+                rows.append((int(h) * 3600 + int(m) * 60 + float(s), t))
+                recent = (recent + [t])[-4:]
     print(f"transcript: {len(rows)} lines from {subs[0].name}")
 else:
     print("no soft subtitles: transcribing speech with faster-whisper (first run downloads the model)")
@@ -140,4 +145,6 @@ for idx, (n, name, start, end) in enumerate(slides):
     md.append(f"\n## Slide {n} [{mmss(start)}-{mmss(end)}]{brief} ![](frames/{name})")
     md += [f"[{mmss(s)}] {t}" for s, t in rows if (start if idx else 0) <= s < nxt]
 (out / "slides.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+if downloaded and not a.keep_video:
+    downloaded.unlink()  # frames + transcript are all that's needed; don't leave big video files in the notes
 print(f"{len(slides)} distinct slides (from {len(files)} samples) -> frames/, sheets/, slides.md")

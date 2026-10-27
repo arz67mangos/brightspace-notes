@@ -7,6 +7,9 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
     Write-Host "Installing ffmpeg..."; winget install --id Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements
     Write-Host "ffmpeg installed: open a NEW terminal after this script so PATH updates." -ForegroundColor Yellow
 }
+if (-not (Get-Command deno -ErrorAction SilentlyContinue)) {  # YouTube downloads need a JS runtime
+    Write-Host "Installing Deno (for YouTube videos)..."; winget install --id DenoLand.Deno -e --accept-package-agreements --accept-source-agreements
+}
 & $py -m pip install -r requirements.txt
 & $py -m playwright install chromium
 git config core.hooksPath .githooks

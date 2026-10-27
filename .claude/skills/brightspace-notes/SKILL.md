@@ -74,6 +74,12 @@ video: P1 | Part 1 Law of Demand | assets/part1
 - `python scripts/anki.py notes/<course> anki-cards.tsv` -> import in Anki (File > Import).
 - Quizzes, self-tests and tutorial help: skills `brightspace-quiz` and `brightspace-tutorial`.
 
+## 6. After every capture session: refresh the agent context
+1. `python scripts/verify.py <ou> notes/<course>` (coverage), `python scripts/rollup.py notes/<course>` (exam focus, glossary, cheat sheets).
+2. `python scripts/master.py notes/<course> --ou <ou>` writes `MASTER.md`: the file any agent reads first when revising (rules: answer only from the notes, cite them, say "not covered" instead of inventing; a topic map saying which note, key terms and source files hold each topic; a file tree).
+3. Write or update `notes/<course>/TIMELINE.md` from the captured schedule, assessment and reminder pages (not the lecture notes): a table of **When | What | Type (lesson F2F/SDL, quiz, CA, presentation, submission, exam, other) | Weight | Source (link to the captured file) | What to prepare with (links to notes)**, plus a "Not stated / to confirm" list. Use only dates and weightings stated in those documents; if only a week number is given, show it as given (and the term start date if the schedule has it). Never guess a date. Mention the source file for every row. Reminder pages are read for dates only; never open or answer the quizzes they point to unless the user asks.
+4. Tell the user what changed and where `MASTER.md` and `TIMELINE.md` are.
+
 ## Rules
 - Only courses the user is enrolled in. Don't redistribute course material; `notes/`, `.profile/`, `cookies.*` and `work/` are personal and gitignored. Never print or commit credentials; don't bypass the pre-commit hook.
 - Ask before downloading in bulk; work module by module. Opening a topic marks it viewed in Brightspace.
