@@ -34,7 +34,9 @@ except Exception as e:
 
 hook = subprocess.run(["git", "config", "core.hooksPath"], capture_output=True, text=True, cwd=ROOT).stdout.strip()
 check("privacy pre-commit hook", hook == ".githooks", "git config core.hooksPath .githooks")
-check("LibreOffice (renders .pptx slides)", bool(shutil.which("soffice")), "install LibreOffice for slide images from .pptx", optional=True)
+soffice = shutil.which("soffice") or next((c for c in (r"C:\Program Files\LibreOffice\program\soffice.exe", r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+                                                       "/Applications/LibreOffice.app/Contents/MacOS/soffice") if Path(c).exists()), None)
+check("LibreOffice (renders .pptx slides)", bool(soffice), "install LibreOffice for slide images from .pptx", optional=True)
 
 cfg = ROOT / ".profile" / "config.json"
 if not (ROOT / ".profile" / "cookies.json").exists() or not cfg.exists():

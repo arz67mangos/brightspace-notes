@@ -58,8 +58,16 @@ def docx_(path):
     return "\n".join(md)
 
 
+def find_soffice():
+    """LibreOffice's installer doesn't always put soffice on PATH: also try its default install folders."""
+    for c in (shutil.which("soffice"), r"C:\Program Files\LibreOffice\program\soffice.exe",
+              r"C:\Program Files (x86)\LibreOffice\program\soffice.exe", "/Applications/LibreOffice.app/Contents/MacOS/soffice"):
+        if c and Path(c).exists():
+            return c
+
+
 def pptx_(path):
-    soffice = shutil.which("soffice")
+    soffice = find_soffice()
     if soffice:  # render slides: convert to pdf and reuse the pdf path
         subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", str(OUT), str(path)], capture_output=True)
         p = OUT / (path.stem + ".pdf")
