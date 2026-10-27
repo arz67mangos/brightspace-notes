@@ -15,7 +15,11 @@ It is **scoped on purpose**: it lists the course outline, asks which modules/top
 Everything lands in `notes/` on your machine (gitignored: it is your institution's material, keep it personal).
 
 ## Install
-Needs Python 3.10+ and git. Then, from this folder:
+Needs Python 3.10+ and git.
+
+**Easiest:** open Claude Code in this folder and type **`/brightspace-setup`** (or say "set this up"). Claude checks what you already have, tells you what's missing with sizes and the exact commands, installs only what you approve, then helps you sign in to Brightspace.
+
+Or install everything in one go, from this folder:
 
 ```bash
 # Windows
@@ -23,7 +27,7 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 # macOS / Linux
 sh install.sh
 ```
-This installs the Python packages, Chromium (for the login window), ffmpeg, switches on the privacy hook, and runs the doctor. It is safe to run again.
+This installs the Python packages, Chromium (for the login window), ffmpeg, Deno (for YouTube), switches on the privacy hook, and runs the doctor. It is safe to run again. On macOS/Linux, if pip refuses ("externally managed environment"), the script tells you how to use a virtual environment (`.venv/`, gitignored).
 
 ## Use it
 Open Claude Code **in this folder** (the skills in `.claude/skills/` load automatically) and just ask, e.g.:
@@ -75,12 +79,17 @@ Checks Python, ffmpeg, git, every Python package, Playwright's Chromium, the pri
 | `bs.py toc <base> <ou>` | course outline with activity IDs -> `notes/<ou>/toc.md` |
 | `bs.py video <base> <ou> <id> <dir>` | finds the player (host adapters), saves captions + stream URL |
 | `bs.py doc <base> <ou> <id> <dir>` | downloads a file topic |
+| `bs.py page <base> <ou> <topicId>` | page text, iframes and links as JSON (for unfamiliar topic types) |
+| `bs.py cookies <base>` | `cookies.txt` for yt-dlp (gitignored) |
+| `bs.py mode show\|headless` | watch the browser work, or hide it |
 | `video.py <url\|file> <dir>` | transcript + slide frames + `slides.md` (+ speech-to-text if no subs) |
 | `docs.py <file> <dir>` | pdf/docx/pptx/zip -> markdown (+ page images) |
 | `linkify.py <note.md>` | turns `[mm:ss]` / `[P2 mm:ss]` into links to the slide frame |
-| `anki.py <notes> out.tsv` | self-check questions -> Anki import file |
+| `anki.py <course notes> [out.tsv]` | self-check questions -> Anki import file (default `anki-cards.tsv` in the notes folder) |
 | `rollup.py <course notes>` | `EXAM_FOCUS.md`, `GLOSSARY.md`, per-module `CHEATSHEET.md` |
-| `doctor.py` | setup check |
+| `master.py <course notes> --ou <ou>` | `MASTER.md`, the file an agent reads first |
+| `verify.py <ou> [<course notes>]` | coverage check -> `notes/<ou>/COVERAGE.md` |
+| `doctor.py [--json]` | setup check |
 
 `<ou>` = the number in your course URL `/d2l/home/<ou>`.
 

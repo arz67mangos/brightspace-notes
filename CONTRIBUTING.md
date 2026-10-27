@@ -4,7 +4,7 @@ Thanks for helping. The most useful contribution is **a video host adapter** for
 
 ## Adding a video host adapter
 
-`bs.py video` opens a topic in a logged-in headless browser, then runs the functions in `ADAPTERS` (`scripts/hosts.py`) in order. The first one that recognises the page wins.
+`bs.py video` opens a topic in the logged-in browser (a visible window by default, hidden with `bs.py mode headless`), then runs the functions in `ADAPTERS` (`scripts/hosts.py`) in order. The first one that recognises the page wins.
 
 An adapter is one function:
 

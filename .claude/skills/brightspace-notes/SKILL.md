@@ -9,7 +9,7 @@ Repo root = the folder containing `scripts/` and `notes/`. Run everything from i
 Related skills: `brightspace-tutorial` (answer tutorial sheets from the notes), `brightspace-quiz` (quiz the user from the notes).
 
 ## 0. Setup
-- First time / something broken: `python scripts/doctor.py` prints exactly what's missing and the fix. `install.ps1` (Windows) / `install.sh` (Mac/Linux) set everything up.
+- First time on this machine: follow the `brightspace-setup` skill (checks what's installed, asks before installing anything). Something broken later: `brightspace-check`. Both use `python scripts/doctor.py`, which prints exactly what's missing and the fix.
 - `python scripts/bs.py login <base-url>`: opens Chromium, the user signs in (SSO/MFA), the script saves the session and exits by itself. Run it in the background and tell the user to sign in. Re-run when the session expires (symptom: redirect to a login page).
 
 **Browser window:** by default the scripts open a visible Chromium window so the user can watch. The first time you run a browser script in a session, tell the user once: "A browser window will open so you can watch; if you'd rather it ran hidden, say 'switch to headless mode'." When they ask to hide it run `python scripts/bs.py mode headless`; to show it again run `python scripts/bs.py mode show`. Don't touch the window while a script runs. The login window is always visible.
@@ -18,11 +18,11 @@ Related skills: `brightspace-tutorial` (answer tutorial sheets from the notes), 
 Ask for the base URL and course (or topic). A pasted course URL contains the orgUnitId (`/d2l/home/<id>`). Run `python scripts/bs.py toc <base> <ou>` (one request, writes `notes/<ou>/toc.md` with every module/topic, its activity ID, and kind), show the modules, and ask which ones they want (AskUserQuestion, multi-select). Process only those.
 - **Only capture what was asked for.** Skip quizzes, surveys, assignment dropboxes, group lists and external links unless the user asks (quizzes: they may want help with participation/pre-class quizzes or self-tests; see `brightspace-quiz`). Never submit, start a timed attempt, or click anything that records a result on the user's behalf.
 - Reuse an existing `toc.md` instead of re-fetching. `link-activity` = usually a video (or a quiz: check the title), `file-activity` = a document.
-- Interactive alternative or when scripts break: Claude in Chrome (`chrome-browser` skill).
+- Interactive alternative or when scripts break: Claude in Chrome, if the user has it connected.
 
 ## 2. Videos
 1. `python scripts/bs.py video <base> <ou> <activityId> notes/<course>/<module>/assets/<slug>`: finds the player through the adapters in `scripts/hosts.py` (YuJa is tested; YouTube/Vimeo/Panopto/Kaltura embeds and generic sniffing are untested), writes the caption file and `source.txt` (signed stream URL, expires in about an hour).
-2. `python scripts/video.py "$(cat <dir>/source.txt)" <dir>` then delete `source.txt`. Produces:
+2. `python scripts/video.py "$(cat <dir>/source.txt)" <dir>` then delete `source.txt`. If step 1 printed `"host": "embed"`, add `--cookies cookies.txt` (written by step 1, gitignored; delete it when done). Produces:
    - `slides.md`: one section per distinct slide: frame link + the narration said while it was on screen. **Start here.**
    - `sheets/sheetNN.jpg`: contact sheets of 4 slides each, labelled `#n mm:ss`. **Read these to see every slide cheaply**, then open single `frames/` jpgs for small print, graphs and tables.
    - `transcript.md`, `frames.txt` (file, start, end, sheet cell).
@@ -71,7 +71,7 @@ video: P1 | Part 1 Law of Demand | assets/part1
 
 ## 5. Revision outputs (on request)
 - `python scripts/rollup.py notes/<course>` -> `EXAM_FOCUS.md` (all exam points), `GLOSSARY.md` (all bold terms), per-module `CHEATSHEET.md`. Offer to tighten a cheat sheet into a one-page summary.
-- `python scripts/anki.py notes/<course> anki-cards.tsv` -> import in Anki (File > Import).
+- `python scripts/anki.py notes/<course>` -> `notes/<course>/anki-cards.tsv`, import in Anki (File > Import).
 - Quizzes, self-tests and tutorial help: skills `brightspace-quiz` and `brightspace-tutorial`.
 
 ## 6. After every capture session: refresh the agent context
