@@ -27,7 +27,7 @@ powershell -ExecutionPolicy Bypass -File install.ps1
 # macOS / Linux
 sh install.sh
 ```
-This installs the Python packages, Chromium (for the login window), ffmpeg, Deno (for YouTube), switches on the privacy hook, and runs the doctor. It is safe to run again. On macOS/Linux, if pip refuses ("externally managed environment"), the script tells you how to use a virtual environment (`.venv/`, gitignored).
+This installs the Python packages, Chromium (for the login window), ffmpeg, Deno (for YouTube), switches on the privacy hook, and runs the doctor. It is safe to run again. Tested on Windows; `install.sh` for macOS/Linux is provided but untested. On macOS/Linux, if pip refuses ("externally managed environment"), the script tells you how to use a virtual environment (`.venv/`, gitignored).
 
 ## Use it
 Open Claude Code **in this folder** (the skills in `.claude/skills/` load automatically) and just ask, e.g.:
