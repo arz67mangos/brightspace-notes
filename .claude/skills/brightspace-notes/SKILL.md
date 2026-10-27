@@ -66,6 +66,9 @@ video: P1 | Part 1 Law of Demand | assets/part1
 - Never invent content that isn't in the transcript/frames/documents. Unknowns go under Gaps.
 - Update `notes/<course>/INDEX.md` (one line per note).
 
+## 4b. Verify coverage (do this after every capture session)
+`python scripts/verify.py <ou> notes/<course>` writes `notes/<ou>/COVERAGE.md`: every topic in the outline with its status (captured / FAILED / not captured, quiz-like ones labelled), and per capture the evidence: slide count, video length vs transcript range (flags transcripts that stop early or have long silent gaps), missing frames, documents downloaded but not converted, PDFs whose page count doesn't match, plus broken links, unlinked citations and self-check questions without answers in the notes. Fix whatever it flags, then tell the user the headline ("12 of 16 topics captured; 3 not requested; 1 failed: ...") and anything it can't see (other Brightspace tools; items not yet released). Every `bs.py video/doc` attempt is logged to `notes/<ou>/capture-log.jsonl` for this.
+
 ## 5. Revision outputs (on request)
 - `python scripts/rollup.py notes/<course>` -> `EXAM_FOCUS.md` (all exam points), `GLOSSARY.md` (all bold terms), per-module `CHEATSHEET.md`. Offer to tighten a cheat sheet into a one-page summary.
 - `python scripts/anki.py notes/<course> anki-cards.tsv` -> import in Anki (File > Import).

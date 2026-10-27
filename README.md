@@ -41,6 +41,9 @@ Claude will:
 
 Other things you can ask: *"quiz me on Topic 2"* (skill `brightspace-quiz`, tracks what you get wrong), *"attempt this tutorial sheet from my notes"* (skill `brightspace-tutorial`, shows which note each answer came from and lists its assumptions), *"make an exam-focus sheet / glossary / cheat sheet"*, *"export Anki cards"*.
 
+## Did it miss anything? `verify`
+After a capture session, ask *"verify the capture"* (or run `python scripts/verify.py <course-id> notes/<course folder>`). It writes `notes/<course-id>/COVERAGE.md`: every topic in the course outline with a status (captured / failed / not captured, with quiz-like items labelled), and evidence per capture: slide count, whether the transcript covers the whole video (flags transcripts that stop early or have long silent gaps), missing frames, documents not yet converted, plus broken links and self-check questions without answers in your notes. It can't see Brightspace tools outside Lessons (Assignments, Discussions, Media Library...) or items not yet released to you; it checks completeness, not whether a note's wording is right (read each note's "Gaps").
+
 ## Watch it work, or hide it
 By default a Chromium window **opens and you can watch** the scripts browse Brightspace. If you'd rather it work invisibly in the background, just tell your agent: *"switch to headless mode"* (and *"show the browser again"* to undo it). It remembers your choice. The sign-in window is always shown, because you have to sign in yourself.
 

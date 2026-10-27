@@ -50,6 +50,14 @@ def ctx(p, headless=None):
     return c
 
 
+def log_capture(ou, aid, kind, ok, **detail):
+    """One line per capture attempt in notes/<ou>/capture-log.jsonl: verify.py compares it with toc.md to show what was NOT captured."""
+    d = ROOT / "notes" / ou
+    d.mkdir(parents=True, exist_ok=True)
+    with open(d / "capture-log.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps({"t": time.strftime("%Y-%m-%d %H:%M:%S"), "aid": aid, "kind": kind, "ok": ok, **detail}) + "\n")
+
+
 def api_version(c, base):
     r = c.request.get(f"{base}/d2l/api/versions/")
     if not r.ok:
@@ -156,6 +164,11 @@ def main(cmd, base, *a):
     with sync_playwright() as p:
         if cmd == "login":
             c = ctx(p, headless=False)
+            # the script's window looks like normal Chrome: label it so people sign in HERE, not in their own Chrome
+            c.add_init_script("document.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');"
+                              "b.textContent='brightspace-notes: sign in in THIS window (not your normal Chrome). It closes by itself when done.';"
+                              "b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#e67e22;color:#fff;"
+                              "font:600 15px sans-serif;padding:8px;text-align:center';document.documentElement.appendChild(b)})")
             pg = c.new_page()
             pg.goto(base)
             print("Log in (incl. MFA) in the browser window; waiting up to 10 min...", flush=True)
@@ -206,6 +219,7 @@ def main(cmd, base, *a):
                 c = ctx(p, headless=True)
                 pg, hit = find(c)
             if not hit:
+                log_capture(ou, aid, "video", False, reason="no video found", dir=outdir)
                 sys.exit("no video found on this topic (is it a file/quiz/link?)")
             o = Path(outdir)
             o.mkdir(parents=True, exist_ok=True)
@@ -214,12 +228,14 @@ def main(cmd, base, *a):
             (o / "source.txt").write_text(hit["source"])
             if hit["host"] == "embed":  # yt-dlp needs the login cookies to open these
                 write_cookies(c)
+            log_capture(ou, aid, "video", bool(hit["source"]), title=title, host=hit["host"], subs=list(hit["subs"]), dir=str(o))
             print(json.dumps({"title": title, "host": hit["host"], "subs": list(hit["subs"]), "source": bool(hit["source"]), "dir": str(o)}))
         elif cmd == "doc":
             ou, aid, outdir = a
             pg, _, act = open_activity(c, base, ou, aid)
             links = file_links(act)
             if not links:
+                log_capture(ou, aid, "doc", False, reason="no downloadable file", dir=outdir)
                 sys.exit("no downloadable file on this topic (not a file-activity?)")
             href, name = links[0]
             r = c.request.get(href)
@@ -229,6 +245,7 @@ def main(cmd, base, *a):
             o.mkdir(parents=True, exist_ok=True)
             f = o / (name or unquote(href.split("?")[0].rsplit("/", 1)[-1]))
             f.write_bytes(r.body())
+            log_capture(ou, aid, "doc", True, file=str(f), bytes=f.stat().st_size, dir=str(o))
             print(json.dumps({"file": str(f), "bytes": f.stat().st_size}))
         elif cmd == "page":
             ou, tid = a

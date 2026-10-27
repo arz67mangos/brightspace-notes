@@ -24,6 +24,12 @@ def fm(text, key):
     return m.group(1).strip() if m else ""
 
 
+def rebase(text, note):
+    """Links in a note are relative to the note's folder; EXAM_FOCUS/GLOSSARY live one level up, so prefix them."""
+    prefix = note.parent.relative_to(root).as_posix() + "/"
+    return re.sub(r"\]\((?!https?:|#|/)([^)]+)\)", lambda m: f"]({prefix}{m.group(1)})", text)
+
+
 exam, gloss, per_module = [], {}, {}
 for note in sorted(root.glob("*/*.md")):
     if note.name in ("CHEATSHEET.md",):
@@ -32,13 +38,13 @@ for note in sorted(root.glob("*/*.md")):
     mod, topic = fm(t, "module") or note.parent.name, fm(t, "topic") or note.stem
     rel = note.relative_to(root).as_posix()
     if pts := section(t, "Likely exam/test points"):
-        exam.append(f"## {mod}\n### [{topic}]({rel})\n{pts}\n")
+        exam.append(f"## {mod}\n### [{topic}]({rel})\n{rebase(pts, note)}\n")
     key = section(t, "Key ideas")
     if key:
         per_module.setdefault(note.parent, []).append(f"### [{topic}]({note.name})\n{key}\n")
     for line in key.splitlines():
         for term in re.findall(r"\*\*([^*]+)\*\*", line)[:1]:  # first bold term of a bullet = the term it defines
-            gloss.setdefault(term.strip(" :").lower(), (term.strip(" :"), re.sub(r"^[-\s]*", "", line), rel))
+            gloss.setdefault(term.strip(" :").lower(), (term.strip(" :"), rebase(re.sub(r"^[-\s]*", "", line), note), rel))
 
 (root / "EXAM_FOCUS.md").write_text("# Exam focus\n\n" + "\n".join(exam), encoding="utf-8")
 (root / "GLOSSARY.md").write_text(
