@@ -16,7 +16,7 @@ Related skills: `brightspace-tutorial` (answer tutorial sheets from the notes), 
 
 ## 1. Scope first: never crawl everything
 Ask for the base URL and course (or topic). A pasted course URL contains the orgUnitId (`/d2l/home/<id>`). Run `python scripts/bs.py toc <base> <ou>` (one request, writes `notes/<ou>/toc.md` with every module/topic, its activity ID, and kind), show the modules, and ask which ones they want (AskUserQuestion, multi-select). Process only those.
-- **Never open, fetch or answer anything quiz-like**: quizzes, prep quizzes, surveys, assignment dropboxes. The user does those themselves. Also skip group lists, external links, anything not asked for.
+- **Only capture what was asked for.** Skip quizzes, surveys, assignment dropboxes, group lists and external links unless the user asks (quizzes: they may want help with participation/pre-class quizzes or self-tests; see `brightspace-quiz`). Never submit, start a timed attempt, or click anything that records a result on the user's behalf.
 - Reuse an existing `toc.md` instead of re-fetching. `link-activity` = usually a video (or a quiz: check the title), `file-activity` = a document.
 - Interactive alternative or when scripts break: Claude in Chrome (`chrome-browser` skill).
 
@@ -32,7 +32,14 @@ Ask for the base URL and course (or topic). A pasted course URL contains the org
 5. Other hosts: if `bs.py video` finds nothing, see CONTRIBUTING.md (add an adapter) or in Chrome use `read_network_requests` to find the `.m3u8/.mp4/.vtt` URLs and pass them to `video.py`.
 
 ## 3. Documents (`file-activity`)
-`python scripts/bs.py doc <base> <ou> <activityId> work/<slug>` downloads the file; then `python scripts/docs.py <file> notes/<course>/<module>/assets/<slug>` converts pdf/docx/pptx/zip to markdown (+ page images for scanned/diagram pages, or all pages with `--images`). Read the `.md`; view page images for diagrams. Lecture-notes documents are the authority for terminology and model diagrams. Don't answer assessed/quiz-like material.
+`python scripts/bs.py doc <base> <ou> <activityId> work/<slug>` downloads the file; then `python scripts/docs.py <file> notes/<course>/<module>/assets/<slug>` converts pdf/docx/pptx/zip to markdown (+ page images for scanned/diagram pages, or all pages with `--images`). Read the `.md`; view page images for diagrams. Lecture-notes documents are the authority for terminology and model diagrams.
+
+## 3b. Topic types and how to handle each
+**Slide decks (PDF/PowerPoint shown in Brightspace's viewer): never screenshot pages.** Download the file with `bs.py doc`, then `docs.py <file> <dir> --images` (text + page images; for `.pptx` without LibreOffice you get text only: say so, offer to install LibreOffice or to use the PDF version if one exists). Work from the text and look at page images only for diagrams.
+**YouTube/Vimeo links** (a page that just lists video links): get the page's links (`docs.py` on the downloaded page, or `bs.py page`), then run `video.py <youtube-url> <dir>` per video: same transcript + slide-frame method (yt-dlp fetches the captions).
+**Interactive games / activities** (drag-and-drop, simulations): the learning is in doing, so don't try to "scrape" a game. Read its instructions/text, note the concept it teaches, and ask the user how they'd like it handled (options: they play it and tell you what they saw; you open it visibly and screenshot the states; you only summarise the intro text). Never press submit/grade.
+**Multi-page interactive courses** (navigate page by page with videos, slide notes and short self-test questions): **new situation: stop and ask first.** Describe what you see and give 2-3 options with your recommendation, for example: (a) step through each page with the browser and record text, embedded videos and self-test questions; (b) check whether the course package can be downloaded; (c) the user pages through while you read each page as they go.
+**Any page type you don't recognise:** don't improvise. Tell the user what it is, give 2-3 options with your pick, and wait for the answer.
 
 ## 4. Write the note
 One file per topic. Front matter lists the videos so citations can be turned into frame links:
@@ -62,7 +69,7 @@ video: P1 | Part 1 Law of Demand | assets/part1
 ## 5. Revision outputs (on request)
 - `python scripts/rollup.py notes/<course>` -> `EXAM_FOCUS.md` (all exam points), `GLOSSARY.md` (all bold terms), per-module `CHEATSHEET.md`. Offer to tighten a cheat sheet into a one-page summary.
 - `python scripts/anki.py notes/<course> anki-cards.tsv` -> import in Anki (File > Import).
-- Quizzing and tutorial help: skills `brightspace-quiz` and `brightspace-tutorial`.
+- Quizzes, self-tests and tutorial help: skills `brightspace-quiz` and `brightspace-tutorial`.
 
 ## Rules
 - Only courses the user is enrolled in. Don't redistribute course material; `notes/`, `.profile/`, `cookies.*` and `work/` are personal and gitignored. Never print or commit credentials; don't bypass the pre-commit hook.

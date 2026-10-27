@@ -16,4 +16,4 @@ Prerequisite: the topic's notes exist (`brightspace-notes` skill). If they don't
    - An **"Items to double-check"** list at the end: every judgement call, ambiguous wording or assumption (e.g. which platform a software question assumes), stated as a choice between readings.
 5. Tell the user plainly which answers are solid and which are judgement calls. The user compares with their own and the model answers; offer to explain any difference.
 
-Rules: never touch quizzes, prep quizzes or any assessed item (graded quizzes, assignments). This is for ungraded tutorial/practice sheets only, and the user decides what is in scope.
+Answer style follows what the user asks for: if they say a question matters and they don't want the answer handed over, point to the note sections and walk them through how to think about it instead. When they haven't said, give the answer with the reasoning and note references.

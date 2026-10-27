@@ -2,7 +2,7 @@
 
 A [Claude Code](https://claude.com/claude-code) skill that turns the Brightspace (D2L) course material **you are enrolled in** into revision notes you can study from, quiz yourself on, or hand to another Claude agent.
 
-It is **scoped on purpose**: it lists the course outline, asks which modules/topics you want, and processes only those. It never touches quizzes.
+It is **scoped on purpose**: it lists the course outline, asks which modules/topics you want, and processes only those. It never starts or submits a quiz attempt for you.
 
 ## What you get
 | Capture | Result |
@@ -34,6 +34,10 @@ Claude will:
 1. run `scripts/bs.py login`: a Chromium window opens, **you sign in yourself** (SSO/MFA fine). Your password never touches the scripts; the session is saved to `.profile/` (gitignored). Re-login when it expires.
 2. list the modules and **ask which topics you want**. Anything you don't pick is never opened.
 3. fetch the videos/documents of those topics, read the slides and narration, and write the notes.
+
+**Quizzes:** paste questions and ask for help. By default you get the answer with the reasoning and note references; if a quiz matters and you want to work it out yourself, say so ("don't give me the answer, point me to the notes") and it will guide you instead. Pasted questions are kept in a personal question bank so it can later set you self-tests in the same question types.
+
+**Slide decks, YouTube lists, interactive pages:** slide decks (PDF/PowerPoint) are downloaded and read as files rather than screenshotted; pages of YouTube links are handled like lecture videos; for interactive games and multi-page courses, or anything it doesn't recognise, the agent stops and asks you first with recommended options.
 
 Other things you can ask: *"quiz me on Topic 2"* (skill `brightspace-quiz`, tracks what you get wrong), *"attempt this tutorial sheet from my notes"* (skill `brightspace-tutorial`, shows which note each answer came from and lists its assumptions), *"make an exam-focus sheet / glossary / cheat sheet"*, *"export Anki cards"*.
 
