@@ -40,6 +40,7 @@ python scripts/verify.py <ou> notes/<course>        -> notes/<ou>/COVERAGE.md (e
 python scripts/rollup.py notes/<course>             EXAM_FOCUS.md, GLOSSARY.md, per-module CHEATSHEET.md
 python scripts/master.py notes/<course> --ou <ou>   MASTER.md (agents read it first when revising)
 python scripts/anki.py notes/<course>               -> notes/<course>/anki-cards.tsv
+python scripts/graph.py <preset>                    text graph (supply/demand shifts, PPC, AD-AS) for tutorial answers
 ```
 `<base>` = `https://<school-host>` (no path); `<ou>` = course id, the number in `/d2l/home/<ou>`; `<aid>` = activity id from `toc.md`. Every script except `doctor.py` prints its usage when run with no arguments.
 
