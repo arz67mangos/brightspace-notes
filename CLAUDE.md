@@ -34,12 +34,15 @@ python scripts/video.py "$(cat <dir>/source.txt)" <dir> [--cookies cookies.txt] 
 python scripts/bs.py doc     <base> <ou> <aid> work/<slug>
 python scripts/docs.py <file> <dir> [--images]      pdf/docx/pptx/html/zip -> markdown (+ page images)
 python scripts/bs.py page    <base> <ou> <topicId>  page text/iframes/links as JSON
+python scripts/bs.py course  <base> <ou> <aid> <dir> multi-lesson SCORM/Rise course -> lessons.json (text + video URL per lesson)
+python scripts/bs.py yuja    <base> <url> <dir>      captions + source.txt for a direct YuJa link
 python scripts/bs.py mode    show|headless          visible browser (default) or hidden
 python scripts/linkify.py <note.md>                 [mm:ss] cites -> links to slide frames
 python scripts/verify.py <ou> notes/<course>        -> notes/<ou>/COVERAGE.md (exit 1 if attention needed)
 python scripts/rollup.py notes/<course>             EXAM_FOCUS.md, GLOSSARY.md, per-module CHEATSHEET.md
 python scripts/master.py notes/<course> --ou <ou>   MASTER.md (agents read it first when revising)
 python scripts/anki.py notes/<course>               -> notes/<course>/anki-cards.tsv
+python scripts/mdtodocx.py <filled.md>              filled course-book .md -> .docx (answers in blue)
 python scripts/graph.py <preset>                    text graph (supply/demand shifts, PPC, AD-AS) for tutorial answers
 ```
 `<base>` = `https://<school-host>` (no path); `<ou>` = course id, the number in `/d2l/home/<ou>`; `<aid>` = activity id from `toc.md`. Every script except `doctor.py` prints its usage when run with no arguments.

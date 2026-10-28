@@ -33,6 +33,8 @@ ap.add_argument("--sim", type=float, default=0.04)
 ap.add_argument("--keep-video", action="store_true")  # by default a video downloaded by yt-dlp is deleted after its frames are taken
 ap.add_argument("--whisper-model", default="base.en")  # only used when no subtitles exist; small.en is more accurate
 a = ap.parse_args()
+if not a.src.strip():
+    sys.exit("empty video URL: the capture step found no stream (rerun bs.py video/yuja)")
 
 out = Path(a.out)
 out.mkdir(parents=True, exist_ok=True)
@@ -54,7 +56,7 @@ else:
     downloaded = None
 
 # ---- transcript: [(seconds, text)] ----
-subs = sorted([*out.glob("*.vtt"), *out.glob("*.srt")]) or sorted(Path(src).parent.glob(Path(src).stem + "*.vtt"))
+subs = sorted(f for f in [*out.glob("*.vtt"), *out.glob("*.srt")] if f.stat().st_size > 0) or sorted(Path(src).parent.glob(Path(src).stem + "*.vtt"))
 rows = []
 if subs:
     recent = []  # YouTube-style rolling captions repeat the previous line in every cue: keep each line once

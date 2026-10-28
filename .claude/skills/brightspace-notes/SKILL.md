@@ -38,7 +38,8 @@ Ask for the base URL and course (or topic). A pasted course URL contains the org
 **Slide decks (PDF/PowerPoint shown in Brightspace's viewer): never screenshot pages.** Download the file with `bs.py doc`, then `docs.py <file> <dir> --images` (text + page images; for `.pptx` without LibreOffice you get text only: say so, offer to install LibreOffice or to use the PDF version if one exists). Work from the text and look at page images only for diagrams.
 **YouTube/Vimeo links** (a page that just lists video links): get the page's links (`docs.py` on the downloaded page, or `bs.py page`), then run `video.py <youtube-url> <dir>` per video: same transcript + slide-frame method (yt-dlp fetches the captions).
 **Interactive games / activities** (drag-and-drop, simulations): the learning is in doing, so don't try to "scrape" a game. Read its instructions/text, note the concept it teaches, and ask the user how they'd like it handled (options: they play it and tell you what they saw; you open it visibly and screenshot the states; you only summarise the intro text). Never press submit/grade.
-**Multi-page interactive courses** (navigate page by page with videos, slide notes and short self-test questions): **new situation: stop and ask first.** Describe what you see and give 2-3 options with your recommendation, for example: (a) step through each page with the browser and record text, embedded videos and self-test questions; (b) check whether the course package can be downloaded; (c) the user pages through while you read each page as they go.
+**Articulate/Rise SCORM courses** (lessons "Video 1..N" + a Review Quiz, each lesson holding a YuJa video and short self-test questions; `bs.py video` finds no stream): run `python scripts/bs.py course <base> <ou> <aid> <dir>` (clicks each lesson, writes `lessons.json` with each lesson's text, the course-book sections/pages it covers, and its YuJa URL; never touches the Review Quiz), then `python scripts/bs.py yuja <base> <url> <dir>` + `video.py` per URL. Lessons that link an external video (library streaming sites) have no `video` in lessons.json: list them for the user.
+**Other multi-page interactive courses** (navigate page by page with videos, slide notes and short self-test questions): **new situation: stop and ask first.** Describe what you see and give 2-3 options with your recommendation, for example: (a) step through each page with the browser and record text, embedded videos and self-test questions; (b) check whether the course package can be downloaded; (c) the user pages through while you read each page as they go.
 **Any page type you don't recognise:** don't improvise. Tell the user what it is, give 2-3 options with your pick, and wait for the answer.
 
 ## 4. Write the note
@@ -73,6 +74,13 @@ video: P1 | Part 1 Law of Demand | assets/part1
 - `python scripts/rollup.py notes/<course>` -> `EXAM_FOCUS.md` (all exam points), `GLOSSARY.md` (all bold terms), per-module `CHEATSHEET.md`. Offer to tighten a cheat sheet into a one-page summary.
 - `python scripts/anki.py notes/<course>` -> `notes/<course>/anki-cards.tsv`, import in Anki (File > Import).
 - Quizzes, self-tests and tutorial help: skills `brightspace-quiz` and `brightspace-tutorial`.
+
+## 5b. Course book with blanks to fill in (printed notes with ____ and empty table cells)
+1. `python scripts/docs.py <book.pdf> notes/<course>/coursebook/source` for the text; render pages with images (`pymupdf` `get_pixmap`) to see tables, graphs and blanks that text extraction loses.
+2. The videos usually say which book section and pages each lesson covers (the SCORM lesson text, e.g. "Course book Chapter 1: section 4.3, pages 12-15"): fill a page's blanks from that lesson's transcript and slides, then from the book's own printed text (mark those *(book text)*), never from outside knowledge. Recompute numbers from the course data files where the book prints partial results, and check they match the printed ones.
+3. Write `notes/<course>/coursebook/chapter-N-filled.md` per chapter: page by page, answers as `**[[answer]]**`. Then `python scripts/mdtodocx.py <file.md>` makes the Word copy (answers in blue bold).
+4. **Quiz check**: Brightspace "hands-on activity" / "practical exercise" items are often timed, graded quizzes (open the item's summary page only, never start it). If a blank matches a quiz question (same question in the book), do not fill it; say it is withheld and ask.
+5. Leave chapters with no released material unfilled and say so.
 
 ## 6. After every capture session: refresh the agent context
 1. `python scripts/verify.py <ou> notes/<course>` (coverage), `python scripts/rollup.py notes/<course>` (exam focus, glossary, cheat sheets).

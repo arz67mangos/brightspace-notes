@@ -5,6 +5,8 @@
   python scripts/bs.py video   <base> <ou> <activityId> <dir>  captions + stream URL (hosts.py adapters)
   python scripts/bs.py doc     <base> <ou> <activityId> <dir>  download a file topic (pdf/docx/pptx/zip...)
   python scripts/bs.py page    <base> <ou> <topicId>           dump page text + iframes/links as JSON
+  python scripts/bs.py course  <base> <ou> <activityId> <dir>  multi-lesson course (SCORM/Rise): lessons.json with each lesson's text + video URL
+  python scripts/bs.py yuja    <base> <video-url> <dir>        captions + source.txt for a direct YuJa link
   python scripts/bs.py cookies <base>                          write cookies.txt (Netscape) for yt-dlp
   python scripts/bs.py mode    show|headless                   watch the browser work (default) or hide it
 
@@ -169,6 +171,37 @@ def open_activity(c, base, ou, aid, player=False):
     return pg, net, act
 
 
+def course_lessons(c, base, ou, aid):
+    """Walk a SCORM/Rise course ("Video 1..N" lessons + a Review Quiz): click each lesson, collect its text and
+    embedded video URL. Never touches quizzes. Returns [{lesson, text, video, iframes}]."""
+    pg, _, _ = open_activity(c, base, ou, aid)
+    fr = next((f for f in pg.frames if "content/index.html" in f.url), None)
+    if not fr:
+        sys.exit("no course player found on this topic (not a SCORM/Rise course?)")
+    names = [n for n in fr.evaluate("() => [...document.querySelectorAll('nav a, nav button, [role=navigation] a, a, button')].map(e => e.innerText.trim())")
+             if re.fullmatch(r"(Video|Lesson|Part) ?\d+.*", n or "")]
+    out, seen = [], set()
+    for k, n in enumerate(dict.fromkeys(names), 1):
+        fr.get_by_text(n, exact=True).first.click()
+        vid, txt = "", ""
+        for _ in range(80):  # up to 40 s: the lesson heading changes, then its player iframe is added (lazy, below the fold)
+            time.sleep(0.5)
+            try:
+                fr.evaluate("() => { const m = document.querySelector('main, [role=main]') || document.scrollingElement; m.scrollTo(0, 1e5); window.scrollTo(0, 1e5); }")
+                txt = fr.evaluate("() => document.body.innerText")
+                srcs = fr.evaluate("() => [...document.querySelectorAll('iframe')].map(i => i.src || i.dataset.src || '')")
+            except Exception:
+                continue
+            ys = [x.split("&preload")[0] for x in srcs if "yuja.com/V/Video" in x]
+            ys = [x for x in ys if x not in seen]  # a previous lesson's player can linger in the DOM: only a new video counts
+            if re.search(rf"LESSON {k} OF", txt) and ys:
+                vid = ys[-1]
+                break
+        seen.add(vid)
+        out.append({"lesson": n, "text": txt, "video": vid})
+    return out
+
+
 def file_links(e, out=None):
     """All (href, filename) download links under a file entity of an activity JSON; enforced-content link first."""
     out = [] if out is None else out
@@ -265,12 +298,48 @@ def main(cmd, base, *a):
             o = Path(outdir)
             o.mkdir(parents=True, exist_ok=True)
             for name, text in hit["subs"].items():
-                (o / name).write_text(text, encoding="utf-8")
+                if text.strip():  # an empty caption file would stop video.py: no subs means it transcribes the audio instead
+                    (o / name).write_text(text, encoding="utf-8")
             (o / "source.txt").write_text(hit["source"])
             if hit["host"] == "embed":  # yt-dlp needs the login cookies to open these
                 write_cookies(c)
             log_capture(ou, aid, "video", bool(hit["source"]), title=title, host=hit["host"], subs=list(hit["subs"]), dir=str(o))
             print(json.dumps({"title": title, "host": hit["host"], "subs": list(hit["subs"]), "source": bool(hit["source"]), "dir": str(o)}))
+        elif cmd == "course":
+            ou, aid, outdir = a
+            les = course_lessons(c, base, ou, aid)
+            o = Path(outdir)
+            o.mkdir(parents=True, exist_ok=True)
+            (o / "lessons.json").write_text(json.dumps(les, indent=1), encoding="utf-8")
+            log_capture(ou, aid, "course", bool(les), lessons=len(les), videos=sum(bool(l["video"]) for l in les), dir=str(o))
+            print(json.dumps([{"lesson": l["lesson"], "video": l["video"]} for l in les], indent=1))
+        elif cmd == "yuja":  # a direct sp.video.yuja.com link (e.g. listed on a page), no Brightspace launch needed
+            url, outdir = a
+            pg, net = c.new_page(), []
+            pg.on("response", lambda r: net.append((r.url, r)))
+            pg.goto(url.split("&preload")[0], wait_until="domcontentloaded")
+            time.sleep(5)
+            vs = pg.viewport_size or {"width": 1280, "height": 720}
+            for i in range(60):  # a direct link doesn't autoplay: the player only asks for its stream after the big play button is clicked
+                if any("/P/Data/VideoSource" in u or "youtube.com/embed/" in u for u, _ in net):
+                    break
+                if i % 10 == 0:
+                    pg.mouse.click(vs["width"] / 2, vs["height"] / 2)
+                time.sleep(0.5)
+            x = type("Ctx", (), {"pg": pg, "c": c, "net": net})()
+            hit = hosts.yuja(x)
+            yt = next((re.search(r"youtube\.com/embed/([\w-]{11})", u) for u, _ in net if "youtube.com/embed/" in u), None)
+            if (not hit or not hit["source"]) and yt:  # YuJa page wrapping a YouTube video: video.py hands it to yt-dlp
+                hit = {"host": "yuja-youtube", "source": f"https://www.youtube.com/watch?v={yt.group(1)}", "subs": {}}
+            if not hit or not hit["source"]:
+                sys.exit("no stream found at that link")
+            o = Path(outdir)
+            o.mkdir(parents=True, exist_ok=True)
+            for name, text in hit["subs"].items():
+                if text.strip():  # an empty caption file would stop video.py: no subs means it transcribes the audio instead
+                    (o / name).write_text(text, encoding="utf-8")
+            (o / "source.txt").write_text(hit["source"])
+            print(json.dumps({"title": pg.title(), "subs": list(hit["subs"]), "dir": str(o)}))
         elif cmd == "doc":
             ou, aid, outdir = a
             pg, _, act = open_activity(c, base, ou, aid)
@@ -309,7 +378,7 @@ def main(cmd, base, *a):
         c.close()
 
 
-ARGS = {"login": 0, "toc": 1, "video": 3, "doc": 3, "page": 2, "cookies": 0, "mode": 0}  # arguments after <base>
+ARGS = {"login": 0, "toc": 1, "video": 3, "doc": 3, "page": 2, "course": 3, "yuja": 2, "cookies": 0, "mode": 0}  # arguments after <base>
 
 if __name__ == "__main__":
     if len(sys.argv) < 3 or len(sys.argv) - 3 != ARGS.get(sys.argv[1]):
