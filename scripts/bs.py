@@ -178,12 +178,15 @@ def course_lessons(c, base, ou, aid):
     fr = next((f for f in pg.frames if "content/index.html" in f.url), None)
     if not fr:
         sys.exit("no course player found on this topic (not a SCORM/Rise course?)")
-    names = [n for n in fr.evaluate("() => [...document.querySelectorAll('nav a, nav button, [role=navigation] a, a, button')].map(e => e.innerText.trim())")
-             if re.fullmatch(r"(Video|Lesson|Part) ?\d+.*", n or "")]
+    names = fr.evaluate("() => [...document.querySelectorAll('a[href*=\"#/lessons/\"]')].map(a => a.innerText.trim().split('\\n')[0])")
+    names = [n for n in names if n and not re.match(r"Lesson \d+ ?-|START COURSE$", n, re.I)]  # skip the "continue: Lesson N - title" link and the cover page's START COURSE button
+    if not names:  # older layout: lessons are named "Video 1", "Part 2" ...
+        names = [n for n in fr.evaluate("() => [...document.querySelectorAll('a, button')].map(e => e.innerText.trim())")
+                 if re.fullmatch(r"(Video|Lesson|Part) ?\d+.*", n or "")]
     out, seen = [], set()
     for k, n in enumerate(dict.fromkeys(names), 1):
         fr.get_by_text(n, exact=True).first.click()
-        vid, txt = "", ""
+        vid, txt, quiet = "", "", 0
         for _ in range(80):  # up to 40 s: the lesson heading changes, then its player iframe is added (lazy, below the fold)
             time.sleep(0.5)
             try:
@@ -194,11 +197,23 @@ def course_lessons(c, base, ou, aid):
                 continue
             ys = [x.split("&preload")[0] for x in srcs if "yuja.com/V/Video" in x]
             ys = [x for x in ys if x not in seen]  # a previous lesson's player can linger in the DOM: only a new video counts
-            if re.search(rf"LESSON {k} OF", txt) and ys:
+            if re.search(rf"LESSON {k} OF", txt, re.I) and ys:
                 vid = ys[-1]
                 break
+            if re.search(rf"LESSON {k} OF", txt, re.I) and not srcs:  # text-only lesson: no player is coming
+                quiet += 1
+                if quiet >= 6:
+                    break
         seen.add(vid)
-        out.append({"lesson": n, "text": txt, "video": vid})
+        try:  # diagrams and templates are images (the lesson text alone loses them): keep the URL and alt text of each real picture
+            imgs = fr.evaluate("() => [...document.querySelectorAll('main img, [role=main] img')].filter(i => i.naturalWidth >= 120).map(i => [i.currentSrc || i.src, i.alt || ''])")
+        except Exception:
+            imgs = []
+        try:  # templates and references are links inside the lesson (not the menu's #/lessons/ ones)
+            links = fr.evaluate("() => [...document.querySelectorAll('main a[href], [role=main] a[href]')].map(a => [a.innerText.trim() || a.getAttribute('aria-label') || '', a.href]).filter(x => !x[1].includes('#/') && !x[1].startsWith('javascript'))")
+        except Exception:
+            links = []
+        out.append({"lesson": n, "text": txt, "video": vid, "images": imgs, "links": links})
     return out
 
 
@@ -310,6 +325,14 @@ def main(cmd, base, *a):
             les = course_lessons(c, base, ou, aid)
             o = Path(outdir)
             o.mkdir(parents=True, exist_ok=True)
+            for k, l in enumerate(les, 1):  # save each lesson's pictures beside lessons.json: images/<lesson no>-<n>.<ext>
+                for j, (u, _alt) in enumerate(l.get("images", []), 1):
+                    r = c.request.get(u)
+                    if r.ok:
+                        (o / "images").mkdir(exist_ok=True)
+                        ext = (r.headers.get("content-type", "image/png").split("/")[-1].split(";")[0] or "png").replace("jpeg", "jpg").replace("svg+xml", "svg")
+                        (o / "images" / f"{k:02d}-{j}.{ext}").write_bytes(r.body())
+                        l["images"][j - 1].append(f"images/{k:02d}-{j}.{ext}")
             (o / "lessons.json").write_text(json.dumps(les, indent=1), encoding="utf-8")
             log_capture(ou, aid, "course", bool(les), lessons=len(les), videos=sum(bool(l["video"]) for l in les), dir=str(o))
             print(json.dumps([{"lesson": l["lesson"], "video": l["video"]} for l in les], indent=1))
