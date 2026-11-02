@@ -176,9 +176,30 @@ def course_lessons(c, base, ou, aid):
     embedded video URL. Never touches quizzes. Returns [{lesson, text, video, iframes}]."""
     pg, _, _ = open_activity(c, base, ou, aid)
     fr = next((f for f in pg.frames if "content/index.html" in f.url), None)
+    if not fr:  # some packages sit behind a "Go to Activity" button and open in a new tab
+        try:
+            with c.expect_page(timeout=20000) as ev:
+                pg.get_by_text("Go to Activity").first.click(timeout=3000)
+            pg = ev.value
+            for _ in range(60):
+                fr = next((f for f in pg.frames if "content/index.html" in f.url), None)
+                if fr:
+                    break
+                pg.wait_for_timeout(500)  # not time.sleep: Playwright must pump events to see the new frames
+        except Exception as e:
+            print("launch failed:", str(e)[:200])
     if not fr:
         sys.exit("no course player found on this topic (not a SCORM/Rise course?)")
-    names = fr.evaluate("() => [...document.querySelectorAll('a[href*=\"#/lessons/\"]')].map(a => a.innerText.trim().split('\\n')[0])")
+    pg.wait_for_timeout(5000)  # the menu renders after the frame appears
+    lessons_js = "() => [...document.querySelectorAll('a[href*=\"#/lessons/\"]')].map(a => a.innerText.trim().split('\\n')[0])"
+    names = fr.evaluate(lessons_js)
+    if not names:  # the menu only appears after the cover page's START COURSE button
+        try:
+            fr.get_by_text("START COURSE").first.click(timeout=4000)
+            pg.wait_for_timeout(4000)
+            names = fr.evaluate(lessons_js)
+        except Exception as e:
+            print("start course failed:", str(e)[:200])
     names = [n for n in names if n and not re.match(r"Lesson \d+ ?-|START COURSE$", n, re.I)]  # skip the "continue: Lesson N - title" link and the cover page's START COURSE button
     if not names:  # older layout: lessons are named "Video 1", "Part 2" ...
         names = [n for n in fr.evaluate("() => [...document.querySelectorAll('a, button')].map(e => e.innerText.trim())")
@@ -204,6 +225,24 @@ def course_lessons(c, base, ou, aid):
                 quiet += 1
                 if quiet >= 6:
                     break
+        for _ in range(60):  # Rise hides later blocks behind CONTINUE buttons: press them (never a quiz answer) until the last one, which moves on to the next lesson
+            try:
+                h = fr.evaluate("() => location.hash")
+                b = fr.locator("button:has-text('CONTINUE'), a:has-text('CONTINUE')").last
+                if not b.is_visible(timeout=1500):
+                    break
+                txt = fr.evaluate("() => document.body.innerText")
+                b.click(timeout=3000)
+                pg.wait_for_timeout(800)
+                if fr.evaluate("() => location.hash") != h:
+                    fr.evaluate("() => history.back()")
+                    pg.wait_for_timeout(1500)
+                    break
+                fr.evaluate("() => { const m = document.querySelector('main, [role=main]') || document.scrollingElement; m.scrollTo(0, 1e5); window.scrollTo(0, 1e5); }")
+            except Exception:
+                break
+        else:
+            pass
         seen.add(vid)
         try:  # diagrams and templates are images (the lesson text alone loses them): keep the URL and alt text of each real picture
             imgs = fr.evaluate("() => [...document.querySelectorAll('main img, [role=main] img')].filter(i => i.naturalWidth >= 120).map(i => [i.currentSrc || i.src, i.alt || ''])")
