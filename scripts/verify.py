@@ -42,6 +42,12 @@ if course and course.exists():  # captures from before the log existed: infer th
         vids = [l.split("|")[-1].strip() for l in head.splitlines() if l.startswith("video:")]
         if m and vids and m.group(1) not in log:
             log[m.group(1)] = {"aid": m.group(1), "kind": "video", "ok": True, "dir": str(note.parent / vids[0]), "inferred": True}
+        src = re.search(r"^source: (.*)$", head, re.M)
+        s = re.sub(r"\b(\d{7,9})-(\d{7,9})\b", lambda r: " ".join(map(str, range(int(r[1]), int(r[2]) + 1))) if 0 < int(r[2]) - int(r[1]) < 50 else r[0],
+                   src.group(1) if src else "")  # "14840188-14840192" = each id in between
+        for aid, why in re.findall(r"\b(\d{7,9})\b(?:\s*\(([^)]*)\))?", s):
+            if aid not in log and not re.search(r"\bnot (opened|read|kept|captured|converted)", why):  # every activity a note says it used
+                log[aid] = {"aid": aid, "kind": "note", "ok": True, "note": note.relative_to(course).as_posix()}
 
 problems, out = [], [f"# Coverage: course {ou}\n"]
 
@@ -77,9 +83,13 @@ def doc_health(entry):
         return ["downloaded file missing or empty"]
     notes = [f"{f.name}, {f.stat().st_size // 1024} KB"]
     stems = {f.stem.lower()}
+    if f.suffix.lower() in (".html", ".htm"):  # bs.py doc also saves the files an HTML topic links: their conversions count
+        stems |= {p.stem.lower() for p in f.parent.iterdir() if p != f}
     mds = [p for root in filter(None, [course, Path(entry.get("dir", "."))]) if root.exists() for p in root.rglob("*.md") if p.stem.lower() in stems]
     if f.suffix.lower() in (".zip",):
         notes.append("zip: check each inner document was converted (docs.py prints one line per file)")
+    elif f.suffix.lower() in (".xlsx", ".xls", ".csv", ".pbix", ".mtw", ".jpg", ".jpeg", ".png"):
+        notes.append("data/image file (nothing to convert)")
     elif not mds:
         notes.append("NOT converted/read yet (run docs.py)")
     elif f.suffix.lower() == ".pdf":
@@ -110,11 +120,13 @@ for line in toc.read_text(encoding="utf-8").splitlines():
     e = log.get(aid)
     if e and e["ok"]:
         status = "captured"
-        ev = "; ".join(video_health(e["dir"]) if e["kind"] == "video" else doc_health(e))
-    elif e:
+        k = e["kind"]
+        ev = (f"cited in {e['note']}" if k == "note" else f"{e.get('lessons')} lessons, {e.get('videos')} videos (bs.py course)" if k == "course"
+              else "submitted (quiz.py)" if k == "quiz-submit" else "; ".join(video_health(e["dir"]) if k == "video" else doc_health(e)))
+    elif e and kind not in ("quizzing", "surveys", "dropbox", "discussions"):  # a failed probe of a quiz is still a skipped quiz
         status, ev = "FAILED", e.get("reason", "capture did not produce a stream/file")
         problems.append(f"{module} / {title}: FAILED")
-    elif QUIZ.search(title):
+    elif QUIZ.search(title) or kind in ("quizzing", "surveys", "dropbox", "discussions"):
         status, ev = "not captured (quiz/assessment-like)", "skipped on purpose"
     else:
         status, ev = "not captured", "not requested yet"

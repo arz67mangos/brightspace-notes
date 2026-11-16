@@ -13,12 +13,13 @@ A toolkit that lets an agent sign in to a student's own Brightspace (D2L) throug
 | `brightspace-notes` | the main workflow: outline, capture videos/docs, write notes, verify coverage, MASTER.md/TIMELINE.md |
 | `brightspace-quiz` | quiz help from the notes, self-tests, question bank, weak spots |
 | `brightspace-tutorial` | draft answers to a tutorial sheet from the notes |
+| `brightspace-preclass-quiz` | attempt + submit ONE ungraded pre-class quiz the user names, after a dry run they approve |
 
 If a user opens the repo fresh and asks for notes, run `python scripts/doctor.py` first; if most checks fail, follow `brightspace-setup` before anything else.
 
 ## Rules that are not negotiable
 - **Scope first, never crawl everything.** Run `bs.py toc`, show the modules, ask which modules/topics to capture, process only those. Opening a topic marks it viewed in Brightspace.
-- **Never start, attempt or submit a quiz, survey or assignment**, and never click anything that records a result. Quiz help works only from text the user pastes.
+- **Never start, attempt or submit a quiz, survey or assignment**, and never click anything that records a result. Quiz help works only from text the user pastes. **Single exception:** an ungraded pre-class quiz the user names, via `brightspace-preclass-quiz` (`quiz.py` refuses graded/timed/limited/assessment quizzes; dry run first, submit only when the user says "submit").
 - **Unfamiliar page types** (interactive games, multi-page courses, anything not covered in `brightspace-notes` section 3b): stop, describe it, give 2-3 options with a recommendation, wait for the answer.
 - **Never ask for, type or handle the user's password.** `bs.py login` opens a window and the user signs in themselves.
 - **Private data stays local:** `notes/`, `.profile/` (login session, cookies, config), `work/`, `cookies.txt`, `*.tsv` are gitignored and the pre-commit hook (`.githooks/pre-commit`, enabled by `git config core.hooksPath .githooks`) blocks them. Never commit, publish or upload notes or course material, never use `--no-verify`, never `git add -f` those paths.
@@ -37,6 +38,8 @@ python scripts/bs.py page    <base> <ou> <topicId>  page text/iframes/links as J
 python scripts/bs.py course  <base> <ou> <aid> <dir> multi-lesson SCORM/Rise course -> lessons.json (text + video URL per lesson)
 python scripts/bs.py yuja    <base> <url> <dir>      captions + source.txt for a direct YuJa link
 python scripts/bs.py mode    show|headless          visible browser (default) or hidden
+powershell -File scripts/ocr.ps1 <pages-dir> <out.md>  Windows OCR over page images (scanned/garbled PDFs)
+python scripts/quiz.py list|read|submit <base> <ou> [<quizId> <file>]  pre-class quizzes only (see brightspace-preclass-quiz)
 python scripts/linkify.py <note.md>                 [mm:ss] cites -> links to slide frames
 python scripts/verify.py <ou> notes/<course>        -> notes/<ou>/COVERAGE.md (exit 1 if attention needed)
 python scripts/rollup.py notes/<course>             EXAM_FOCUS.md, GLOSSARY.md, per-module CHEATSHEET.md

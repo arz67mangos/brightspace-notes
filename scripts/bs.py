@@ -88,6 +88,9 @@ def walk_seq(e, depth=0, out=None):
         aid = next((l["href"].split("/activity/")[1].split("?")[0] for l in s.get("links", [])
                     if "self" in l.get("rel", []) and "/activity/" in l["href"]), "?")
         kind = next((x for sub in s.get("entities", []) if "about" in sub.get("rel", []) for x in sub["class"] if x != "activity"), "")
+        icon = next((sub["properties"].get("iconSetKey", "").split(":")[-1] for sub in s.get("entities", []) if "icon" in sub.get("rel", [])), "")
+        if icon in ("quizzing", "surveys", "dropbox", "discussions"):  # graded tools look like plain links: name them so verify skips them
+            kind = icon
         title = s["properties"]["title"].strip()
         out.append(f"{'  ' * depth}- **{title}** ({aid})" if "sequence" in c else f"{'  ' * depth}- {title} ({aid}, {kind})")
         walk_seq(s, depth + 1, out)
@@ -175,7 +178,11 @@ def course_lessons(c, base, ou, aid):
     """Walk a SCORM/Rise course ("Video 1..N" lessons + a Review Quiz): click each lesson, collect its text and
     embedded video URL. Never touches quizzes. Returns [{lesson, text, video, iframes}]."""
     pg, _, _ = open_activity(c, base, ou, aid)
-    fr = next((f for f in pg.frames if "content/index.html" in f.url), None)
+    for _ in range(40):  # slow SCORM engines take >6 s to inject the player
+        fr = next((f for f in pg.frames if "content/index.html" in f.url), None)
+        if fr:
+            break
+        pg.wait_for_timeout(1000)
     if not fr:  # some packages sit behind a "Go to Activity" button and open in a new tab
         try:
             with c.expect_page(timeout=20000) as ev:
@@ -241,8 +248,23 @@ def course_lessons(c, base, ou, aid):
                 fr.evaluate("() => { const m = document.querySelector('main, [role=main]') || document.scrollingElement; m.scrollTo(0, 1e5); window.scrollTo(0, 1e5); }")
             except Exception:
                 break
-        else:
-            pass
+        try:  # accordions and tabs keep their text out of innerText until opened: open each (view-only; knowledge checks are skipped)
+            extra = fr.evaluate("""async () => {
+              const ok = e => !e.closest('[class*=knowledge], [class*=quiz], nav, header');
+              document.querySelectorAll('main [aria-expanded=false], [role=main] [aria-expanded=false]').forEach(b => ok(b) && b.click());
+              const t = [];
+              for (const tab of document.querySelectorAll('main [role=tab], [role=main] [role=tab]')) {
+                if (!ok(tab)) continue;
+                tab.click(); await new Promise(r => setTimeout(r, 400));
+                const p = document.getElementById(tab.getAttribute('aria-controls'));
+                if (p) t.push(`[${tab.innerText.trim()}] ${p.innerText.trim()}`);
+              }
+              await new Promise(r => setTimeout(r, 800));
+              return [document.body.innerText, t.join('\\n')];
+            }""")
+            txt = extra[0] + ("\n\nTABS:\n" + extra[1] if extra[1] else "")
+        except Exception as e:
+            print("expand failed:", str(e)[:150])
         seen.add(vid)
         try:  # diagrams and templates are images (the lesson text alone loses them): keep the URL and alt text of each real picture
             imgs = fr.evaluate("() => [...document.querySelectorAll('main img, [role=main] img')].filter(i => i.naturalWidth >= 120).map(i => [i.currentSrc || i.src, i.alt || ''])")
@@ -279,7 +301,7 @@ def main(cmd, base, *a):
             c = ctx(p, headless=False)
             # the script's window looks like normal Chrome: label it so people sign in HERE, not in their own Chrome
             c.add_init_script("document.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');"
-                              "b.textContent='brightspace-notes: sign in in THIS window (not your normal Chrome). It closes by itself when done.';"
+                              "b.textContent='claude-agent-brightspace-notes: sign in in THIS window (not your normal Chrome). It closes by itself when done.';"
                               "b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#e67e22;color:#fff;"
                               "font:600 15px sans-serif;padding:8px;text-align:center';document.documentElement.appendChild(b)})")
             pg = c.new_page()
@@ -416,10 +438,20 @@ def main(cmd, base, *a):
             o = Path(outdir)
             o.mkdir(parents=True, exist_ok=True)
             # the name comes from the server: keep a plain file name (no folders, no characters Windows forbids)
-            f = o / (re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name or unquote(href.split("?")[0].rsplit("/", 1)[-1])).strip(" .") or "download")
+            safe = lambda n: re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", n).strip(" .") or "download"
+            f = o / safe(name or unquote(href.split("?")[0].rsplit("/", 1)[-1]))
             f.write_bytes(r.body())
             log_capture(ou, aid, "doc", True, file=str(f), bytes=f.stat().st_size, dir=str(o))
             print(json.dumps({"file": str(f), "bytes": f.stat().st_size}))
+            if f.suffix.lower() in (".html", ".htm"):  # an HTML topic often only links the real files (PDF/xlsx in the course file area): fetch those too
+                import html as _h
+                from urllib.parse import urljoin
+                for u in dict.fromkeys(_h.unescape(x) for x in re.findall(r'(?:href|src)="([^"]*(?:csfiles/|viewFile\.d2lfile|/content/enforced/)[^"]*)"', r.text())):
+                    rr = c.request.get(urljoin(href, u))
+                    if rr.ok and "text/html" not in rr.headers.get("content-type", ""):
+                        g = o / safe(unquote(u.split("?")[0].rsplit("/", 1)[-1]))
+                        g.write_bytes(rr.body())
+                        print(json.dumps({"linked": str(g), "bytes": g.stat().st_size}))
         elif cmd == "page":
             ou, tid = a
             pg = c.new_page()
