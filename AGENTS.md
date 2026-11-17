@@ -26,7 +26,8 @@ The output must be the full study set, not a chat summary of what you found. A c
 4. **One note per topic** from the template in `course-capture`, with `[mm:ss]` cites linked by `linkify.py`.
 5. **Verify**: `verify.py` -> `COVERAGE.md`; fix every flagged item or list it under Gaps; report the headline numbers.
 6. **Refresh the course context**: `rollup.py`, `master.py`, then `TIMELINE.md`. `master.py` writes the Parked / Reminders rule into `MASTER.md`.
-7. **Report** what was captured, what failed or was skipped, and where `MASTER.md` and `TIMELINE.md` are. A final answer that is only a summary of findings, with no files written, means the workflow was not followed.
+7. **Checklist**: before reporting, tick every line of `docs/capture-checklist.md` against the files (and `manifest.py check` if the user gave a manifest).
+8. **Report** what was captured, what failed or was skipped, and where `MASTER.md` and `TIMELINE.md` are. A final answer that is only a summary of findings, with no files written, means the workflow was not followed.
 
 **Parked / Reminders (every thread):** when the user says to hold something off or to remind them, add it to a running "Parked / Reminders" list (per course in a course thread) and repeat the whole list at the end of every reply until they finish or drop it.
 
@@ -59,6 +60,7 @@ python scripts/master.py notes/<course> --ou <ou>   MASTER.md (agents read it fi
 python scripts/anki.py notes/<course>               -> notes/<course>/anki-cards.tsv
 python scripts/mdtodocx.py <filled.md>              filled course-book .md -> .docx (answers in blue)
 python scripts/graph.py <preset>                    text graph (supply/demand shifts, PPC, AD-AS) for tutorial answers
+python scripts/manifest.py make|check notes <file.json>  reference manifest of a complete course set; check lists what this install is missing
 python scripts/sync_agents.py [--check]             copy .claude/skills -> .agents/skills; --check exits 1 on drift
 ```
 `<base>` = `https://<school-host>` (no path); `<ou>` = course id, the number in `/d2l/home/<ou>`; `<aid>` = activity id from `toc.md`. Every script except `doctor.py` prints its usage when run with no arguments.
