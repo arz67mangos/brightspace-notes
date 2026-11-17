@@ -1,5 +1,5 @@
 ---
-name: brightspace-notes
+name: course-capture
 description: Read and navigate a Brightspace (D2L) course, capture its lecture videos (subtitles + one frame per slide) and documents, and write revision notes as .md files per topic with timestamp-linked slide references. Use when the user asks to capture, summarise, or make revision notes from Brightspace/e-learning material or lecture videos.
 ---
 
@@ -16,7 +16,7 @@ Related skills: `brightspace-tutorial` (answer tutorial sheets from the notes), 
 
 ## 1. Scope first: never crawl everything
 Ask for the base URL and course (or topic). A pasted course URL contains the orgUnitId (`/d2l/home/<id>`). Run `python scripts/bs.py toc <base> <ou>` (one request, writes `notes/<ou>/toc.md` with every module/topic, its activity ID, and kind), show the modules, and ask which ones they want (AskUserQuestion, multi-select). Process only those.
-- **Only capture what was asked for.** Skip quizzes, surveys, assignment dropboxes, group lists and external links unless the user asks (quizzes: they may want help with participation/pre-class quizzes or self-tests; see `brightspace-quiz`). Never submit, start a timed attempt, or click anything that records a result on the user's behalf (only exception: an ungraded pre-class quiz the user names, via `brightspace-preclass-quiz`).
+- **Only capture what was asked for.** Skip quizzes, surveys, assignment dropboxes, group lists and external links unless the user asks (quizzes: they may want help with participation/pre-class quizzes or self-tests; see `brightspace-quiz`). Never submit, start a timed attempt, or click anything that records a result on the user's behalf.
 - Reuse an existing `toc.md` instead of re-fetching. `link-activity` = usually a video (or a quiz: check the title), `file-activity` = a document.
 - Interactive alternative or when scripts break: Claude in Chrome, if the user has it connected.
 

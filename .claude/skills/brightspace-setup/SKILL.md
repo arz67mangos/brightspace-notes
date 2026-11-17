@@ -1,6 +1,6 @@
 ---
 name: brightspace-setup
-description: First-time setup of brightspace-notes on a new machine. Detects what is already installed (OS, Python, Python packages, Playwright Chromium, ffmpeg, Deno, LibreOffice, privacy hook), explains it in plain language, asks before downloading or installing each item, installs only what the user approves, re-checks, then guides the Brightspace address and first sign-in. Use when the user has just cloned the repo, says "set this up", "install it", "first time", or runs /brightspace-setup. For an existing install that stopped working, use brightspace-check.
+description: First-time setup of course-capture-agent on a new machine. Detects what is already installed (OS, Python, Python packages, Playwright Chromium, ffmpeg, Deno, LibreOffice, privacy hook), explains it in plain language, asks before downloading or installing each item, installs only what the user approves, re-checks, then guides the Brightspace address and first sign-in. Use when the user has just cloned the repo, says "set this up", "install it", "first time", or runs /brightspace-setup. For an existing install that stopped working, use brightspace-check.
 ---
 
 # First-time setup

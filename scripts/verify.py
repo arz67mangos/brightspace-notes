@@ -122,7 +122,7 @@ for line in toc.read_text(encoding="utf-8").splitlines():
         status = "captured"
         k = e["kind"]
         ev = (f"cited in {e['note']}" if k == "note" else f"{e.get('lessons')} lessons, {e.get('videos')} videos (bs.py course)" if k == "course"
-              else "submitted (quiz.py)" if k == "quiz-submit" else "; ".join(video_health(e["dir"]) if k == "video" else doc_health(e)))
+              else "; ".join(video_health(e["dir"]) if k == "video" else doc_health(e)))
     elif e and kind not in ("quizzing", "surveys", "dropbox", "discussions"):  # a failed probe of a quiz is still a skipped quiz
         status, ev = "FAILED", e.get("reason", "capture did not produce a stream/file")
         problems.append(f"{module} / {title}: FAILED")

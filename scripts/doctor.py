@@ -1,4 +1,4 @@
-"""Check that everything brightspace-notes needs is installed, and say exactly how to fix what isn't.
+"""Check that everything course-capture-agent needs is installed, and say exactly how to fix what isn't.
 
   python scripts/doctor.py           human-readable report
   python scripts/doctor.py --json    same checks as JSON (used by the brightspace-setup skill)

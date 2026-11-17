@@ -1,6 +1,6 @@
 ---
 name: brightspace-check
-description: Check that the brightspace-notes setup is healthy (Python, ffmpeg, packages, browser, privacy hook, Brightspace login) and fix what's missing, explained in plain language. Use when the user says "check my setup", "is everything ok", "it's not working", or runs /brightspace-check. For a first install on a new machine use brightspace-setup instead.
+description: Check that the course-capture-agent setup is healthy (Python, ffmpeg, packages, browser, privacy hook, Brightspace login) and fix what's missing, explained in plain language. Use when the user says "check my setup", "is everything ok", "it's not working", or runs /brightspace-check. For a first install on a new machine use brightspace-setup instead.
 ---
 
 # Setup check (for non-technical users)

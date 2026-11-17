@@ -11,7 +11,7 @@ Source material: `notes/<course>/<module>/*.md` (sections "Self-check questions"
 - **Default** (nothing said): answer pasted questions directly, with a one-line reason each and the note/slide it comes from, so they can double-check.
 - **"Guide me" / "this one matters, don't give the answer" / "point me to the notes"**: do **not** state the answer. Point to the note sections (link them), explain the concept and how to reason about that question type, ask what they think, and confirm or correct after they answer.
 - If it's unclear which they want and the quiz looks important (graded, timed, "Mandatory"), ask once: "Straight answers, or point me to the notes and walk me through it?" Then follow the choice for the rest of the session.
-- Never open, start or submit a Brightspace quiz attempt yourself. Work only from text the user pastes or notes they have. **One exception:** an ungraded pre-class quiz the user names, through the `brightspace-preclass-quiz` skill (`quiz.py` checks eligibility; dry run first, submit only on the user's "submit").
+- Never open, start or submit a Brightspace quiz attempt yourself. Work only from text the user pastes or notes they have.
 
 ## 2. Pasted questions become a question bank
 When the user pastes quiz questions, append them to `notes/<course>/question-bank.md` (gitignored, personal): question, options, the question **type** (MCQ single/multi, true-false, fill-in, short answer, calculation), topic, and the answer **only once the user has confirmed it** (otherwise mark "unverified"). Use the bank later to run self-tests in the **same question types and wording style**, writing fresh variants (new numbers/examples) instead of repeating the originals.

@@ -301,7 +301,7 @@ def main(cmd, base, *a):
             c = ctx(p, headless=False)
             # the script's window looks like normal Chrome: label it so people sign in HERE, not in their own Chrome
             c.add_init_script("document.addEventListener('DOMContentLoaded',()=>{const b=document.createElement('div');"
-                              "b.textContent='claude-agent-brightspace-notes: sign in in THIS window (not your normal Chrome). It closes by itself when done.';"
+                              "b.textContent='Course Capture Agent: sign in in THIS window (not your normal Chrome). It closes by itself when done.';"
                               "b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#e67e22;color:#fff;"
                               "font:600 15px sans-serif;padding:8px;text-align:center';document.documentElement.appendChild(b)})")
             pg = c.new_page()

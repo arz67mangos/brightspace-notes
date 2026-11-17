@@ -1,6 +1,6 @@
-﻿# brightspace-notes
+﻿# course-capture-agent
 
-A [Claude Code](https://claude.com/claude-code) skill that turns the Brightspace (D2L) course material **you are enrolled in** into revision notes you can study from, quiz yourself on, or hand to another Claude agent.
+An agent toolkit (works with [Claude Code](https://claude.com/claude-code) and Codex) that signs in to **your own** Brightspace (D2L), captures the course material you choose with a Playwright scraper (videos, slides, documents, pages) and turns it into a per-course study set: notes, `MASTER.md`, deadlines, quizzes and tutorial drafts. Instructions for the agent are in `AGENTS.md` (the source of truth; `CLAUDE.md` points to it).
 
 It is **scoped on purpose**: it lists the course outline, asks which modules/topics you want, and processes only those. It never starts or submits a quiz attempt for you.
 
@@ -21,10 +21,10 @@ Two ways: let Claude Code do it for you (easiest), or follow the four steps your
 1. Install **Git** (https://git-scm.com/download/win, default options; Claude Code on Windows needs it) and **Claude Code** (the Claude desktop app from https://claude.com/download, then the **Code** tab, or the terminal version from https://claude.com/claude-code).
 2. Open Claude Code in your **Documents** folder and paste this message:
 
-   > Clone https://github.com/arz67mangos/brightspace-notes.git into this folder. Then read `brightspace-notes/.claude/skills/brightspace-setup/SKILL.md` and follow it from inside the `brightspace-notes` folder: check what I have, install Python if it's missing, and ask me before installing anything.
+   > Clone https://github.com/arz67mangos/course-capture-agent.git into this folder. Then read `course-capture-agent/.claude/skills/brightspace-setup/SKILL.md` and follow it from inside the `course-capture` folder: check what I have, install Python if it's missing, and ask me before installing anything.
 
 3. Claude clones the repo, tells you what's missing (with sizes), installs what you approve and opens the Brightspace sign-in window for you.
-4. When it's done, **close Claude Code and reopen it in the new `Documents\brightspace-notes` folder**. From then on always open it there; that's how it loads the skills.
+4. When it's done, **close Claude Code and reopen it in the new `Documents\course-capture-agent` folder**. From then on always open it there; that's how it loads the skills.
 
 ### Or step by step
 #### 1. Install the basics (once per computer, Windows)
@@ -39,15 +39,15 @@ Open **PowerShell** (Start menu, type "PowerShell"), then copy-paste these two l
 
 ```bash
 cd $HOME\Documents
-git clone https://github.com/arz67mangos/brightspace-notes.git
+git clone https://github.com/arz67mangos/course-capture-agent.git
 ```
-You now have a folder `Documents\brightspace-notes`. To get updates later, run `git pull` inside that folder.
+You now have a folder `Documents\course-capture-agent`. To get updates later, run `git pull` inside that folder.
 
 *No git?* On the GitHub page click the green **Code** button > **Download ZIP**, then right-click the file > **Extract All**. This works, but you won't get updates with `git pull`, and the privacy guard (below) needs git, so cloning is better.
 
 #### 3. Open the folder in Claude Code
-- Desktop app: in the **Code** tab, choose the `brightspace-notes` folder as the project folder.
-- Terminal: `cd $HOME\Documents\brightspace-notes`, then run `claude`.
+- Desktop app: in the **Code** tab, choose the `course-capture` folder as the project folder.
+- Terminal: `cd $HOME\Documents\course-capture-agent`, then run `claude`.
 
 Always open Claude Code **in this folder**: that's how it finds the skills below.
 

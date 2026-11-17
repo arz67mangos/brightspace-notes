@@ -5,7 +5,7 @@ description: Attempt a tutorial/homework sheet from the user's own revision note
 
 # Tutorial helper
 
-Prerequisite: the topic's notes exist (`brightspace-notes` skill). If they don't, capture the topic's videos first.
+Prerequisite: the topic's notes exist (`course-capture` skill). If they don't, capture the topic's videos first.
 
 1. Convert the sheet: `python scripts/docs.py "<tutorial file>" work/tutorial` and read the .md. Note links (e.g. article URLs) and any "not in student copy" remarks.
 2. **List missing information before answering.** If a question refers to something you can't see (an article, a figure, group-discussion text the tutor hands out), say so and ask; don't invent the question. Offer a clearly labelled "likely angle" at most.
